@@ -1,18 +1,60 @@
-// Phase 1 scaffold. Real implementation in Phase 5.
-// Two cron jobs:
-//   - Morning (8am ET, Mon-Fri): create_strike_market for each MAG7 ticker
-//   - Settlement (4:05pm ET, Mon-Fri): settle_market for each open contract
-import "dotenv/config";
-
-const TICKERS = ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA"] as const;
+import cron from "node-cron";
+import { loadConfig } from "./config.js";
+import { logger } from "./logger.js";
+import { loadProgram } from "./program.js";
+import { runMorningJob } from "./jobs/morning.js";
+import { runSettlementJob } from "./jobs/settlement.js";
 
 async function main(): Promise<void> {
-  console.log(`[meridian-automation] starting (cluster=${process.env.SOLANA_CLUSTER ?? "devnet"})`);
-  console.log(`[meridian-automation] tracking tickers: ${TICKERS.join(", ")}`);
-  console.log("[meridian-automation] Phase 5 will wire up the morning + settlement cron jobs.");
+  const cfg = loadConfig();
+  const ctx = loadProgram(cfg);
+
+  logger.info(
+    {
+      cluster: cfg.cluster,
+      programId: cfg.programId.toBase58(),
+      automationKey: ctx.wallet.publicKey.toBase58(),
+      morningCron: cfg.morningCron,
+      settlementCron: cfg.settlementCron,
+    },
+    "automation service starting"
+  );
+
+  // Schedule jobs in Eastern time so NYSE-aligned crons are intuitive.
+  cron.schedule(
+    cfg.morningCron,
+    () => {
+      runMorningJob(cfg, ctx).catch((err) =>
+        logger.error({ err: err.message, stack: err.stack }, "morning job crashed")
+      );
+    },
+    { timezone: "America/New_York" }
+  );
+
+  cron.schedule(
+    cfg.settlementCron,
+    () => {
+      runSettlementJob(cfg, ctx).catch((err) =>
+        logger.error({ err: err.message, stack: err.stack }, "settlement job crashed")
+      );
+    },
+    { timezone: "America/New_York" }
+  );
+
+  // Allow manual one-shot runs via CLI: `tsx src/index.ts morning` or `settlement`.
+  const arg = process.argv[2];
+  if (arg === "morning") {
+    await runMorningJob(cfg, ctx);
+    process.exit(0);
+  } else if (arg === "settlement") {
+    await runSettlementJob(cfg, ctx);
+    process.exit(0);
+  }
+
+  logger.info("scheduler is live; press Ctrl+C to exit");
 }
 
 main().catch((err) => {
-  console.error(err);
+  logger.error({ err: err.message, stack: err.stack }, "fatal");
   process.exit(1);
 });
