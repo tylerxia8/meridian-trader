@@ -1,5 +1,5 @@
 use crate::errors::MeridianError;
-use crate::state::{Config, Market};
+use crate::state::{Config, Market, Outcome};
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, MintTo, Token, TokenAccount, Transfer};
 
@@ -58,6 +58,10 @@ pub struct MintPair<'info> {
 pub fn handler(ctx: Context<MintPair>, amount: u64) -> Result<()> {
     require!(!ctx.accounts.config.paused, MeridianError::Paused);
     require!(amount > 0, MeridianError::ZeroAmount);
+    require!(
+        ctx.accounts.market.outcome == Outcome::Unsettled,
+        MeridianError::AlreadySettled
+    );
 
     // 1. Pull USDC from user into the vault.
     token::transfer(

@@ -21,11 +21,19 @@ pub struct InitializeConfig<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn handler(ctx: Context<InitializeConfig>) -> Result<()> {
+pub fn handler(
+    ctx: Context<InitializeConfig>,
+    max_staleness_secs: u32,
+    max_conf_ratio_bps: u16,
+    admin_override_delay_secs: u32,
+) -> Result<()> {
     let config = &mut ctx.accounts.config;
     config.admin = ctx.accounts.admin.key();
     config.usdc_mint = ctx.accounts.usdc_mint.key();
     config.paused = false;
+    config.max_staleness_secs = max_staleness_secs;
+    config.max_conf_ratio_bps = max_conf_ratio_bps;
+    config.admin_override_delay_secs = admin_override_delay_secs;
     config.bump = ctx.bumps.config;
     Ok(())
 }

@@ -5,7 +5,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 
 #[derive(Accounts)]
-#[instruction(ticker: [u8; 8], strike_price_usd_cents: u64, expiry_ts: i64)]
+#[instruction(ticker: [u8; 8], strike_price_usd_cents: u64, expiry_ts: i64, price_feed_id: [u8; 32])]
 pub struct CreateStrikeMarket<'info> {
     #[account(
         mut,
@@ -73,6 +73,7 @@ pub fn handler(
     ticker: [u8; 8],
     strike_price_usd_cents: u64,
     expiry_ts: i64,
+    price_feed_id: [u8; 32],
 ) -> Result<()> {
     require!(ticker[0].is_ascii_uppercase(), MeridianError::InvalidTicker);
     require!(strike_price_usd_cents > 0, MeridianError::InvalidStrike);
@@ -87,6 +88,7 @@ pub fn handler(
     market.yes_mint = ctx.accounts.yes_mint.key();
     market.no_mint = ctx.accounts.no_mint.key();
     market.vault = ctx.accounts.vault.key();
+    market.price_feed_id = price_feed_id;
     market.outcome = Outcome::Unsettled;
     market.settlement_price_usd_cents = 0;
     market.settled_at = 0;

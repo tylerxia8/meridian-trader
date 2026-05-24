@@ -94,8 +94,8 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full design. In short:
 ## Status
 
 - [x] Phase 1 — Repo scaffolding
-- [ ] Phase 2 — Anchor program: config, create_strike_market, mint_pair, redeem, pause
-- [ ] Phase 3 — Pyth integration + settle_market + admin_settle
+- [x] Phase 2 — Anchor program: config, create_strike_market, mint_pair, redeem, pause
+- [x] Phase 3 — Pyth integration + settle_market + admin_settle + redeem_yes/no
 - [ ] Phase 4 — Phoenix CLOB integration + atomic mint-and-sell
 - [ ] Phase 5 — Automation service (morning + settlement cron jobs)
 - [ ] Phase 6 — Next.js frontend (Markets, Trade, Portfolio, History)
