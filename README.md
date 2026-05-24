@@ -97,8 +97,8 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full design. In short:
 - [x] Phase 2 — Anchor program: config, create_strike_market, mint_pair, redeem, pause
 - [x] Phase 3 — Pyth integration + settle_market + admin_settle + redeem_yes/no
 - [x] Phase 4 — Phoenix CLOB linkage + TS trade-router for all 4 paths
-- [ ] Phase 5 — Automation service (morning + settlement cron jobs)
-- [ ] Phase 6 — Next.js frontend (Markets, Trade, Portfolio, History)
+- [x] Phase 5 — Automation service (morning + settlement cron jobs)
+- [x] Phase 6 — Next.js frontend skeleton (Landing, Markets, Trade, Portfolio, History)
 - [ ] Phase 7 — Devnet deployment + lifecycle demo
 - [ ] Phase 8 — Polish: docs, CI, property-based tests
 
