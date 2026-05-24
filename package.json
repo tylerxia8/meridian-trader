@@ -1,0 +1,31 @@
+{
+  "name": "meridian-trader",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Binary stock outcome markets on Solana — MAG7 0DTE prediction markets",
+  "license": "MIT",
+  "workspaces": [
+    "app",
+    "automation"
+  ],
+  "scripts": {
+    "build:program": "anchor build",
+    "test:program": "anchor test",
+    "deploy:devnet": "anchor deploy --provider.cluster devnet",
+    "lifecycle:demo": "tsx scripts/lifecycle.ts",
+    "create:markets": "tsx scripts/create-markets.ts",
+    "settle:markets": "tsx scripts/settle-markets.ts",
+    "dev:app": "npm run dev --workspace=app",
+    "dev:automation": "npm run dev --workspace=automation",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
