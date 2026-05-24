@@ -11,6 +11,7 @@
   "scripts": {
     "build:program": "anchor build",
     "test:program": "anchor test",
+    "test:program:skip-deploy": "anchor test --skip-deploy",
     "deploy:devnet": "anchor deploy --provider.cluster devnet",
     "lifecycle:demo": "tsx scripts/lifecycle.ts",
     "create:markets": "tsx scripts/create-markets.ts",
@@ -20,8 +21,18 @@
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.30.1",
+    "@solana/spl-token": "^0.4.6",
+    "@solana/web3.js": "^1.95.0"
+  },
   "devDependencies": {
+    "@types/chai": "^4.3.0",
+    "@types/mocha": "^10.0.0",
     "@types/node": "^20.11.0",
+    "chai": "^4.3.0",
+    "mocha": "^10.2.0",
+    "ts-mocha": "^10.0.0",
     "tsx": "^4.7.0",
     "typescript": "^5.4.0"
   },

@@ -1,50 +1,66 @@
 use anchor_lang::prelude::*;
 
-declare_id!("Mer1d1an1111111111111111111111111111111111");
+pub mod errors;
+pub mod instructions;
+pub mod state;
 
-// Phase 1 scaffold: instruction surface only. Account contexts and bodies
-// are implemented in Phase 2 (mint/redeem) and Phase 3 (oracle/settlement).
+use instructions::{
+    AdminToggle, CreateStrikeMarket, InitializeConfig, MintPair, RedeemPair,
+};
+
+// Placeholder. After first `anchor build`, run `anchor keys sync` to replace
+// this with the program ID derived from `target/deploy/meridian-keypair.json`.
+declare_id!("11111111111111111111111111111111");
+
+// USDC has 6 decimals. We give Yes/No the same so that
+// `vault.amount == yes_mint.supply == no_mint.supply` is the natural
+// raw-units invariant (no scaling factor).
+pub const TOKEN_DECIMALS: u8 = 6;
+
 #[program]
 pub mod meridian {
     use super::*;
 
-    pub fn initialize_config(_ctx: Context<Initialize>) -> Result<()> {
-        unimplemented!("Phase 2");
+    /// One-time global setup. Stores the admin authority and the USDC mint
+    /// every market will collateralize against.
+    pub fn initialize_config(ctx: Context<InitializeConfig>) -> Result<()> {
+        instructions::initialize_config::handler(ctx)
     }
 
+    /// Create one strike market: Yes mint, No mint, USDC vault, and the
+    /// per-day Market account. Admin-only.
     pub fn create_strike_market(
-        _ctx: Context<Initialize>,
-        _ticker: [u8; 8],
-        _strike_price_usd_cents: u64,
-        _expiry_ts: i64,
+        ctx: Context<CreateStrikeMarket>,
+        ticker: [u8; 8],
+        strike_price_usd_cents: u64,
+        expiry_ts: i64,
     ) -> Result<()> {
-        unimplemented!("Phase 2");
+        instructions::create_strike_market::handler(ctx, ticker, strike_price_usd_cents, expiry_ts)
     }
 
-    pub fn mint_pair(_ctx: Context<Initialize>, _amount: u64) -> Result<()> {
-        unimplemented!("Phase 2");
+    /// Deposit `amount` of USDC (raw units; 1.00 USDC = 1_000_000). The
+    /// caller receives `amount` of both Yes and No tokens.
+    pub fn mint_pair(ctx: Context<MintPair>, amount: u64) -> Result<()> {
+        instructions::mint_pair::handler(ctx, amount)
     }
 
-    pub fn redeem(_ctx: Context<Initialize>, _amount: u64) -> Result<()> {
-        unimplemented!("Phase 2");
+    /// Burn `amount` of Yes AND `amount` of No (the caller must hold both),
+    /// receive `amount` of USDC back. Works pre- or post-settlement —
+    /// a matching pair is always worth $1.00 by the invariant.
+    pub fn redeem_pair(ctx: Context<RedeemPair>, amount: u64) -> Result<()> {
+        instructions::redeem_pair::handler(ctx, amount)
     }
 
-    pub fn settle_market(_ctx: Context<Initialize>) -> Result<()> {
-        unimplemented!("Phase 3");
+    /// Admin: halt mint_pair and redeem_pair. Trading on Phoenix is independent.
+    pub fn pause(ctx: Context<AdminToggle>) -> Result<()> {
+        instructions::admin::pause(ctx)
     }
 
-    pub fn admin_settle(_ctx: Context<Initialize>, _price_usd_cents: u64) -> Result<()> {
-        unimplemented!("Phase 3");
+    /// Admin: resume mint_pair and redeem_pair.
+    pub fn unpause(ctx: Context<AdminToggle>) -> Result<()> {
+        instructions::admin::unpause(ctx)
     }
 
-    pub fn pause(_ctx: Context<Initialize>) -> Result<()> {
-        unimplemented!("Phase 2");
-    }
-
-    pub fn unpause(_ctx: Context<Initialize>) -> Result<()> {
-        unimplemented!("Phase 2");
-    }
+    // settle_market, admin_settle, and redeem_winning land in Phase 3
+    // when Pyth integration arrives.
 }
-
-#[derive(Accounts)]
-pub struct Initialize {}

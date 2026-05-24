@@ -6,10 +6,10 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-meridian = "Mer1d1an1111111111111111111111111111111111"
+meridian = "11111111111111111111111111111111"
 
 [programs.devnet]
-meridian = "Mer1d1an1111111111111111111111111111111111"
+meridian = "11111111111111111111111111111111"
 
 [registry]
 url = "https://api.apr.dev"
