@@ -36,47 +36,106 @@ docs/                   Architecture decisions, trade-offs, risks
 
 ## Prerequisites
 
-This project requires the Solana toolchain. On Windows, install via WSL (recommended) or directly:
-
-| Tool | Version | Install |
+| Tool | Version | Verify |
 |---|---|---|
-| Node.js | ≥ 20 | https://nodejs.org |
-| Rust | ≥ 1.75 | https://rustup.rs |
-| Solana CLI | ≥ 1.18 | https://docs.solana.com/cli/install-solana-cli-tools |
-| Anchor | ≥ 0.30 | `cargo install --git https://github.com/coral-xyz/anchor avm --locked && avm install latest && avm use latest` |
+| Node.js | ≥ 20 | `node --version` |
+| Rust | ≥ 1.75 | `rustc --version` |
+| Solana CLI | ≥ 1.18 | `solana --version` |
+| Anchor | ≥ 0.30 | `anchor --version` |
 
-Once installed, verify:
+### On Windows (WSL strongly recommended)
+
+The Solana toolchain has rough edges on native Windows. The most reliable path is WSL 2 + Ubuntu:
+
+```powershell
+# In PowerShell as Administrator (one-time):
+wsl --install -d Ubuntu
+# Restart, open Ubuntu, then continue inside WSL:
+```
+
+Then inside the WSL shell:
 
 ```bash
-node --version
-rustc --version
-solana --version
-anchor --version
+# Node.js 20 via nvm
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+source ~/.bashrc
+nvm install 20
+
+# Rust
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+source ~/.cargo/env
+
+# Solana CLI
+sh -c "$(curl -sSfL https://release.solana.com/v1.18.17/install)"
+export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+
+# Anchor (via AVM)
+cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
+avm install 0.30.1
+avm use 0.30.1
+
+# Verify everything
+node --version && rustc --version && solana --version && anchor --version
 ```
+
+Clone this repo inside WSL too (don't mix Windows-path and WSL-path checkouts):
+
+```bash
+git clone https://github.com/tylerxia8/meridian-trader.git
+cd meridian-trader
+```
+
+### On macOS / Linux
+
+```bash
+brew install node                              # macOS
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+sh -c "$(curl -sSfL https://release.solana.com/v1.18.17/install)"
+cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
+avm install 0.30.1 && avm use 0.30.1
+```
+
+## First-build sanity check
+
+Before running anything, verify the program compiles and the tests pass:
+
+```bash
+npm install                          # installs root + workspace deps
+anchor build                         # compiles the Rust program
+anchor keys sync                     # syncs the on-chain program ID into lib.rs + Anchor.toml
+anchor test                          # runs the Anchor TS integration tests
+cd automation && npm test            # runs the pure-TS strike calc tests
+```
+
+If `anchor build` complains about the Pyth SDK API, drop me a note with the error — first compile against the real SDK may need a tiny tweak.
 
 ## Quick start (devnet)
 
 ```bash
-# 1. Install dependencies
-npm install
-
-# 2. Copy env
-cp .env.example .env
-# fill in PYTH_FEED_* and (after deploy) MERIDIAN_PROGRAM_ID
-
-# 3. Generate keypairs
+# 1. Generate keypairs (one-time)
+mkdir -p keypairs
 solana-keygen new -o ./keypairs/admin.json --no-bip39-passphrase
 solana-keygen new -o ./keypairs/automation.json --no-bip39-passphrase
-solana airdrop 2 $(solana address -k ./keypairs/admin.json) --url devnet
+solana config set --url https://api.devnet.solana.com
+solana airdrop 2 $(solana address -k ./keypairs/admin.json)
+solana airdrop 2 $(solana address -k ./keypairs/automation.json)
 
-# 4. Build and deploy the program
+# 2. Copy + fill env
+cp .env.example .env
+# Fill in PYTH_FEED_<TICKER> values from
+# https://pyth.network/developers/price-feed-ids#solana-stable
+# (Equities Stable section)
+
+# 3. Deploy the program
 anchor build
 anchor deploy --provider.cluster devnet
+# Copy the printed program id into MERIDIAN_PROGRAM_ID in .env
 
-# 5. Run the end-to-end lifecycle demo (create → mint → trade → settle → redeem)
+# 4. Run the end-to-end lifecycle demo
+#    create → mint → trade (or admin_settle stand-in) → redeem
 npm run lifecycle:demo
 
-# 6. Frontend
+# 5. Frontend
 npm run dev --workspace=app
 # → http://localhost:3000
 ```
