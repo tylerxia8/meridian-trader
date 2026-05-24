@@ -5,8 +5,8 @@ pub mod instructions;
 pub mod state;
 
 use instructions::{
-    AdminSettle, AdminToggle, CreateStrikeMarket, InitializeConfig, MintPair, RedeemNo, RedeemPair,
-    RedeemYes, SettleMarket,
+    AdminSettle, AdminToggle, CreateStrikeMarket, InitializeConfig, LinkPhoenixMarket, MintPair,
+    RedeemNo, RedeemPair, RedeemYes, SettleMarket,
 };
 
 // Placeholder. After first `anchor build`, run `anchor keys sync` to replace
@@ -93,6 +93,16 @@ pub mod meridian {
     /// Post-settlement: burn winning No tokens, receive $1.00 USDC each.
     pub fn redeem_no(ctx: Context<RedeemNo>, amount: u64) -> Result<()> {
         instructions::redeem_winning::redeem_no(ctx, amount)
+    }
+
+    /// Admin: associate this strike's Phoenix CLOB market (Yes vs USDC)
+    /// with the Market account. The Phoenix market itself is created
+    /// off-chain via the Phoenix SDK before this is called.
+    pub fn link_phoenix_market(
+        ctx: Context<LinkPhoenixMarket>,
+        phoenix_market: Pubkey,
+    ) -> Result<()> {
+        instructions::link_phoenix_market::handler(ctx, phoenix_market)
     }
 
     /// Admin: halt mint_pair and all redeem operations. Settlement is

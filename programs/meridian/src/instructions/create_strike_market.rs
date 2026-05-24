@@ -88,6 +88,7 @@ pub fn handler(
     market.yes_mint = ctx.accounts.yes_mint.key();
     market.no_mint = ctx.accounts.no_mint.key();
     market.vault = ctx.accounts.vault.key();
+    market.phoenix_market = Pubkey::default();
     market.price_feed_id = price_feed_id;
     market.outcome = Outcome::Unsettled;
     market.settlement_price_usd_cents = 0;

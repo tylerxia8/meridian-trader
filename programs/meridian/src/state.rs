@@ -37,6 +37,11 @@ pub struct Market {
     pub yes_mint: Pubkey,
     pub no_mint: Pubkey,
     pub vault: Pubkey,
+    /// Phoenix CLOB market address for this strike (Yes/USDC). All four trade
+    /// paths route through this single book. `Pubkey::default()` means
+    /// "not yet linked" — admin calls `link_phoenix_market` after creating
+    /// the Phoenix market off-chain.
+    pub phoenix_market: Pubkey,
     /// Pyth feed id (32 bytes, hex-decoded). Verified against PriceUpdateV2 at settlement.
     pub price_feed_id: [u8; 32],
     pub outcome: Outcome,

@@ -42,6 +42,16 @@ External dependencies:
 
 **Trade-off:** One Phoenix market per strike means ~30-40 markets per day across MAG7 — non-trivial setup cost. We'll batch creation in the morning cron and reuse market addresses where possible.
 
+**On-chain glue:** The Meridian `Market` account stores the linked `phoenix_market: Pubkey`. Admin calls `link_phoenix_market` after creating the Phoenix market off-chain via the SDK. Meridian does *not* CPI into Phoenix — the four trade paths are built as multi-instruction transactions on the client (atomic at the Solana tx level).
+
+**Phoenix devnet:** Phoenix is primarily deployed on mainnet-beta. For the devnet lifecycle demo, we either (a) clone the Phoenix program into the local validator using `Anchor.toml`'s `test.validator.clone`, or (b) deploy a local Phoenix instance. The lifecycle script documents both paths.
+
+**The four trade paths** (all single-tx, atomic, one wallet approval):
+- **Buy Yes** → Phoenix `Buy` (taker against asks)
+- **Sell Yes** → Phoenix `Sell` (taker against bids)
+- **Buy No** → `[meridian.mint_pair, Phoenix Sell-Yes IOC]` in one tx. User deposits $1 per pair, sells Yes at market, keeps No.
+- **Sell No** → Phoenix `Buy Yes` (user already has No; new Yes + existing No = $1 redeemable pair). Optionally append `meridian.redeem_pair` to net out to USDC in the same tx.
+
 ### 3. Pyth oracle
 
 **Choice:** Pyth Network's pull oracle (`pyth-solana-receiver-sdk`).
