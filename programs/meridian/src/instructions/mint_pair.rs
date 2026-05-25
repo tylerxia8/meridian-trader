@@ -66,7 +66,7 @@ pub fn handler(ctx: Context<MintPair>, amount: u64) -> Result<()> {
     // 1. Pull USDC from user into the vault.
     token::transfer(
         CpiContext::new(
-            ctx.accounts.token_program.to_account_info(),
+            ctx.accounts.token_program.key(),
             Transfer {
                 from: ctx.accounts.user_usdc.to_account_info(),
                 to: ctx.accounts.vault.to_account_info(),
@@ -94,7 +94,7 @@ pub fn handler(ctx: Context<MintPair>, amount: u64) -> Result<()> {
 
     token::mint_to(
         CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
+            ctx.accounts.token_program.key(),
             MintTo {
                 mint: ctx.accounts.yes_mint.to_account_info(),
                 to: ctx.accounts.user_yes.to_account_info(),
@@ -107,7 +107,7 @@ pub fn handler(ctx: Context<MintPair>, amount: u64) -> Result<()> {
 
     token::mint_to(
         CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
+            ctx.accounts.token_program.key(),
             MintTo {
                 mint: ctx.accounts.no_mint.to_account_info(),
                 to: ctx.accounts.user_no.to_account_info(),

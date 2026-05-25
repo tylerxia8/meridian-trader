@@ -9,6 +9,13 @@ use instructions::{
     RedeemNo, RedeemPair, RedeemYes, SettleMarket,
 };
 
+// Re-export instruction submodules at crate root so Anchor 1.0's #[program]
+// macro can resolve the auto-generated __client_accounts_<name> modules.
+pub use instructions::{
+    admin, admin_settle, create_strike_market, initialize_config, link_phoenix_market, mint_pair,
+    redeem_pair, redeem_winning, settle_market,
+};
+
 // Placeholder. After first `anchor build`, run `anchor keys sync` to replace
 // this with the program ID derived from `target/deploy/meridian-keypair.json`.
 declare_id!("11111111111111111111111111111111");

@@ -62,7 +62,7 @@ pub fn handler(ctx: Context<RedeemPair>, amount: u64) -> Result<()> {
     // 1. Burn `amount` Yes from the user.
     token::burn(
         CpiContext::new(
-            ctx.accounts.token_program.to_account_info(),
+            ctx.accounts.token_program.key(),
             Burn {
                 mint: ctx.accounts.yes_mint.to_account_info(),
                 from: ctx.accounts.user_yes.to_account_info(),
@@ -75,7 +75,7 @@ pub fn handler(ctx: Context<RedeemPair>, amount: u64) -> Result<()> {
     // 2. Burn `amount` No from the user.
     token::burn(
         CpiContext::new(
-            ctx.accounts.token_program.to_account_info(),
+            ctx.accounts.token_program.key(),
             Burn {
                 mint: ctx.accounts.no_mint.to_account_info(),
                 from: ctx.accounts.user_no.to_account_info(),
@@ -102,7 +102,7 @@ pub fn handler(ctx: Context<RedeemPair>, amount: u64) -> Result<()> {
 
     token::transfer(
         CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
+            ctx.accounts.token_program.key(),
             Transfer {
                 from: ctx.accounts.vault.to_account_info(),
                 to: ctx.accounts.user_usdc.to_account_info(),
