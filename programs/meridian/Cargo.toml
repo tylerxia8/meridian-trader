@@ -17,9 +17,9 @@ no-log-ix-name = []
 idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 
 [dependencies]
-# Pinned to 0.32.1 to match pyth-solana-receiver-sdk 1.2.0's internal anchor
-# version. With anchor-lang 1.0.2 we hit a borsh 1.x vs 0.10.x trait mismatch
-# on PriceUpdateV2. Anchor CLI stays at 1.0.2; only the crate version is pinned.
-anchor-lang = { version = "0.32.1", features = ["init-if-needed"] }
-anchor-spl = { version = "0.32.1", features = ["metadata"] }
-pyth-solana-receiver-sdk = "1.2.0"
+anchor-lang = { version = "1.0.2", features = ["init-if-needed"] }
+anchor-spl = { version = "1.0.2", features = ["metadata"] }
+# pyth-solana-receiver-sdk is intentionally NOT a dep. v1.2.0's PriceUpdateV2
+# fails to compile under Anchor 1.0 (dual-borsh trait mismatch internal to
+# Pyth's crate). settle_market is stubbed; admin_settle handles all settlement
+# paths until a compatible Pyth SDK version ships. See docs/ARCHITECTURE.md.

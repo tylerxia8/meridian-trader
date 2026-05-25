@@ -2,6 +2,10 @@
 
 Per PRD requirement: short risks/limitations note, no regulatory or compliance claims.
 
+## Known scope deviation (v1)
+
+`settle_market` (the permissionless Pyth-oracle settlement path) is currently stubbed because `pyth-solana-receiver-sdk 1.2.0` has an internal borsh-version conflict that prevents compilation under Anchor 1.0. **`admin_settle` is the only working settlement path until Pyth ships a compatible SDK.** Outcome correctness is unaffected — admin_settle applies the same `finalize_settlement` rule — but settlement requires the admin signer rather than being permissionless. See [ARCHITECTURE.md § Pyth oracle](ARCHITECTURE.md) for restore steps.
+
 ## Technical risks
 
 | Risk | Mitigation | Residual |
