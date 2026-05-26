@@ -45,7 +45,7 @@ pub struct RedeemYes<'info> {
     pub token_program: Program<'info, Token>,
 }
 
-pub fn handler(ctx: Context<RedeemYes>, amount: u64) -> Result<()> {
+pub fn redeem_yes_handler(ctx: Context<RedeemYes>, amount: u64) -> Result<()> {
     require!(!ctx.accounts.config.paused, MeridianError::Paused);
     require!(amount > 0, MeridianError::ZeroAmount);
     require!(

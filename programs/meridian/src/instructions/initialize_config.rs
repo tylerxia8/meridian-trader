@@ -21,7 +21,7 @@ pub struct InitializeConfig<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn handler(
+pub fn initialize_config_handler(
     ctx: Context<InitializeConfig>,
     max_staleness_secs: u32,
     max_conf_ratio_bps: u16,

@@ -68,7 +68,7 @@ pub struct CreateStrikeMarket<'info> {
     pub rent: Sysvar<'info, Rent>,
 }
 
-pub fn handler(
+pub fn create_strike_market_handler(
     ctx: Context<CreateStrikeMarket>,
     ticker: [u8; 8],
     strike_price_usd_cents: u64,

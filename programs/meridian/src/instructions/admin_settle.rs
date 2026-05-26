@@ -24,7 +24,7 @@ pub struct AdminSettle<'info> {
     pub market: Account<'info, Market>,
 }
 
-pub fn handler(ctx: Context<AdminSettle>, price_usd_cents: u64) -> Result<()> {
+pub fn admin_settle_handler(ctx: Context<AdminSettle>, price_usd_cents: u64) -> Result<()> {
     let market = &mut ctx.accounts.market;
     let config = &ctx.accounts.config;
     require!(market.outcome == Outcome::Unsettled, MeridianError::AlreadySettled);

@@ -23,7 +23,7 @@ pub struct LinkPhoenixMarket<'info> {
     pub market: Account<'info, Market>,
 }
 
-pub fn handler(ctx: Context<LinkPhoenixMarket>, phoenix_market: Pubkey) -> Result<()> {
+pub fn link_phoenix_market_handler(ctx: Context<LinkPhoenixMarket>, phoenix_market: Pubkey) -> Result<()> {
     let market = &mut ctx.accounts.market;
     market.phoenix_market = phoenix_market;
     Ok(())

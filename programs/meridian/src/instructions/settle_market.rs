@@ -39,7 +39,7 @@ pub struct SettleMarket<'info> {
     pub price_update: UncheckedAccount<'info>,
 }
 
-pub fn handler(_ctx: Context<SettleMarket>) -> Result<()> {
+pub fn settle_market_handler(_ctx: Context<SettleMarket>) -> Result<()> {
     // Pyth SDK compatibility blocker — see file header.
     err!(MeridianError::OracleStale)
 }

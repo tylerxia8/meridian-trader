@@ -4,17 +4,13 @@ pub mod errors;
 pub mod instructions;
 pub mod state;
 
-use instructions::{
-    AdminSettle, AdminToggle, CreateStrikeMarket, InitializeConfig, LinkPhoenixMarket, MintPair,
-    RedeemNo, RedeemPair, RedeemYes, SettleMarket,
-};
-
-// Re-export instruction submodules at crate root so Anchor 1.0's #[program]
-// macro can resolve the auto-generated __client_accounts_<name> modules.
-pub use instructions::{
-    admin, admin_settle, create_strike_market, initialize_config, link_phoenix_market, mint_pair,
-    redeem_no, redeem_pair, redeem_yes, settle_market,
-};
+// Glob-import instructions so:
+// 1. Accounts structs (MintPair, RedeemPair, ...) are in scope here.
+// 2. Auto-generated __client_accounts_* / __cpi_client_accounts_* modules
+//    are at the crate root, which Anchor 1.0's #[program] macro requires.
+// 3. Renamed handler functions (mint_pair_handler, redeem_pair_handler, ...)
+//    are callable directly without a module prefix.
+pub use instructions::*;
 
 // Placeholder. After first `anchor build`, run `anchor keys sync` to replace
 // this with the program ID derived from `target/deploy/meridian-keypair.json`.
@@ -37,12 +33,7 @@ pub mod meridian {
         max_conf_ratio_bps: u16,
         admin_override_delay_secs: u32,
     ) -> Result<()> {
-        instructions::initialize_config::handler(
-            ctx,
-            max_staleness_secs,
-            max_conf_ratio_bps,
-            admin_override_delay_secs,
-        )
+        initialize_config_handler(ctx, max_staleness_secs, max_conf_ratio_bps, admin_override_delay_secs)
     }
 
     /// Create one strike market: Yes mint, No mint, USDC vault, and the
@@ -55,61 +46,51 @@ pub mod meridian {
         expiry_ts: i64,
         price_feed_id: [u8; 32],
     ) -> Result<()> {
-        instructions::create_strike_market::handler(
-            ctx,
-            ticker,
-            strike_price_usd_cents,
-            expiry_ts,
-            price_feed_id,
-        )
+        create_strike_market_handler(ctx, ticker, strike_price_usd_cents, expiry_ts, price_feed_id)
     }
 
     /// Deposit `amount` of USDC (raw units; 1.00 USDC = 1_000_000). The
     /// caller receives `amount` of both Yes and No tokens. Blocked if the
     /// market is already settled.
     pub fn mint_pair(ctx: Context<MintPair>, amount: u64) -> Result<()> {
-        instructions::mint_pair::handler(ctx, amount)
+        mint_pair_handler(ctx, amount)
     }
 
     /// Burn `amount` of Yes AND `amount` of No (the caller must hold both),
     /// receive `amount` of USDC back. Works pre- or post-settlement —
     /// a matched pair is always worth $1.00 by the invariant.
     pub fn redeem_pair(ctx: Context<RedeemPair>, amount: u64) -> Result<()> {
-        instructions::redeem_pair::handler(ctx, amount)
+        redeem_pair_handler(ctx, amount)
     }
 
-    /// Permissionless. Reads Pyth's closing price for the market's feed,
-    /// validates staleness + confidence, writes the binary outcome.
-    /// Outcome is immutable once written.
+    /// Currently stubbed (returns an error). Pyth SDK is not Anchor-1.0
+    /// compatible yet — see docs/ARCHITECTURE.md. Use admin_settle instead.
     pub fn settle_market(ctx: Context<SettleMarket>) -> Result<()> {
-        instructions::settle_market::handler(ctx)
+        settle_market_handler(ctx)
     }
 
-    /// Admin override for the case where Pyth is unreliable. Enforces a
-    /// time delay (config.admin_override_delay_secs) since market expiry
-    /// before it can be invoked. Outcome is immutable once written.
+    /// Admin override. Enforces a time delay
+    /// (config.admin_override_delay_secs) since market expiry. Currently
+    /// the only working settlement path. Outcome is immutable once written.
     pub fn admin_settle(ctx: Context<AdminSettle>, price_usd_cents: u64) -> Result<()> {
-        instructions::admin_settle::handler(ctx, price_usd_cents)
+        admin_settle_handler(ctx, price_usd_cents)
     }
 
     /// Post-settlement: burn winning Yes tokens, receive $1.00 USDC each.
     pub fn redeem_yes(ctx: Context<RedeemYes>, amount: u64) -> Result<()> {
-        instructions::redeem_yes::handler(ctx, amount)
+        redeem_yes_handler(ctx, amount)
     }
 
     /// Post-settlement: burn winning No tokens, receive $1.00 USDC each.
     pub fn redeem_no(ctx: Context<RedeemNo>, amount: u64) -> Result<()> {
-        instructions::redeem_no::handler(ctx, amount)
+        redeem_no_handler(ctx, amount)
     }
 
     /// Admin: associate this strike's Phoenix CLOB market (Yes vs USDC)
     /// with the Market account. The Phoenix market itself is created
     /// off-chain via the Phoenix SDK before this is called.
-    pub fn link_phoenix_market(
-        ctx: Context<LinkPhoenixMarket>,
-        phoenix_market: Pubkey,
-    ) -> Result<()> {
-        instructions::link_phoenix_market::handler(ctx, phoenix_market)
+    pub fn link_phoenix_market(ctx: Context<LinkPhoenixMarket>, phoenix_market: Pubkey) -> Result<()> {
+        link_phoenix_market_handler(ctx, phoenix_market)
     }
 
     /// Admin: halt mint_pair and all redeem operations. Settlement is

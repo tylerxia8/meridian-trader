@@ -9,13 +9,18 @@ pub mod redeem_pair;
 pub mod redeem_yes;
 pub mod settle_market;
 
-pub use admin::AdminToggle;
-pub use admin_settle::AdminSettle;
-pub use create_strike_market::CreateStrikeMarket;
-pub use initialize_config::InitializeConfig;
-pub use link_phoenix_market::LinkPhoenixMarket;
-pub use mint_pair::MintPair;
-pub use redeem_no::RedeemNo;
-pub use redeem_pair::RedeemPair;
-pub use redeem_yes::RedeemYes;
-pub use settle_market::SettleMarket;
+// Glob re-export each submodule's items (Accounts struct + auto-generated
+// __client_accounts_* and __cpi_client_accounts_* modules) so they're
+// reachable at `crate::*` after lib.rs does `pub use instructions::*`.
+// Anchor 1.0's #[program] macro requires the auto-gen modules to be at
+// the crate root.
+pub use admin::*;
+pub use admin_settle::*;
+pub use create_strike_market::*;
+pub use initialize_config::*;
+pub use link_phoenix_market::*;
+pub use mint_pair::*;
+pub use redeem_no::*;
+pub use redeem_pair::*;
+pub use redeem_yes::*;
+pub use settle_market::*;
