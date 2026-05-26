@@ -13,7 +13,7 @@ use instructions::{
 // macro can resolve the auto-generated __client_accounts_<name> modules.
 pub use instructions::{
     admin, admin_settle, create_strike_market, initialize_config, link_phoenix_market, mint_pair,
-    redeem_pair, redeem_winning, settle_market,
+    redeem_no, redeem_pair, redeem_yes, settle_market,
 };
 
 // Placeholder. After first `anchor build`, run `anchor keys sync` to replace
@@ -94,12 +94,12 @@ pub mod meridian {
 
     /// Post-settlement: burn winning Yes tokens, receive $1.00 USDC each.
     pub fn redeem_yes(ctx: Context<RedeemYes>, amount: u64) -> Result<()> {
-        instructions::redeem_winning::redeem_yes(ctx, amount)
+        instructions::redeem_yes::handler(ctx, amount)
     }
 
     /// Post-settlement: burn winning No tokens, receive $1.00 USDC each.
     pub fn redeem_no(ctx: Context<RedeemNo>, amount: u64) -> Result<()> {
-        instructions::redeem_winning::redeem_no(ctx, amount)
+        instructions::redeem_no::handler(ctx, amount)
     }
 
     /// Admin: associate this strike's Phoenix CLOB market (Yes vs USDC)
