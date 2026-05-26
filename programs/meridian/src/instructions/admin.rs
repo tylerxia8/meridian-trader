@@ -11,12 +11,12 @@ pub struct AdminToggle<'info> {
     pub config: Account<'info, Config>,
 }
 
-pub fn pause(ctx: Context<AdminToggle>) -> Result<()> {
+pub fn pause_handler(ctx: Context<AdminToggle>) -> Result<()> {
     ctx.accounts.config.paused = true;
     Ok(())
 }
 
-pub fn unpause(ctx: Context<AdminToggle>) -> Result<()> {
+pub fn unpause_handler(ctx: Context<AdminToggle>) -> Result<()> {
     ctx.accounts.config.paused = false;
     Ok(())
 }

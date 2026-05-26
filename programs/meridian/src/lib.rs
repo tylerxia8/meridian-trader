@@ -97,11 +97,11 @@ pub mod meridian {
     /// Admin: halt mint_pair and all redeem operations. Settlement is
     /// independent and continues even when paused.
     pub fn pause(ctx: Context<AdminToggle>) -> Result<()> {
-        instructions::admin::pause(ctx)
+        pause_handler(ctx)
     }
 
     /// Admin: resume mint_pair and redeem operations.
     pub fn unpause(ctx: Context<AdminToggle>) -> Result<()> {
-        instructions::admin::unpause(ctx)
+        unpause_handler(ctx)
     }
 }

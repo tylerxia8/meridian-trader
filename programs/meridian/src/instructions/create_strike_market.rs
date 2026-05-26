@@ -14,7 +14,7 @@ pub struct CreateStrikeMarket<'info> {
     pub admin: Signer<'info>,
 
     #[account(seeds = [Config::SEED], bump = config.bump)]
-    pub config: Account<'info, Config>,
+    pub config: Box<Account<'info, Config>>,
 
     #[account(
         init,
@@ -28,7 +28,7 @@ pub struct CreateStrikeMarket<'info> {
         ],
         bump,
     )]
-    pub market: Account<'info, Market>,
+    pub market: Box<Account<'info, Market>>,
 
     #[account(
         init,
@@ -38,7 +38,7 @@ pub struct CreateStrikeMarket<'info> {
         mint::decimals = TOKEN_DECIMALS,
         mint::authority = market,
     )]
-    pub yes_mint: Account<'info, Mint>,
+    pub yes_mint: Box<Account<'info, Mint>>,
 
     #[account(
         init,
@@ -48,7 +48,7 @@ pub struct CreateStrikeMarket<'info> {
         mint::decimals = TOKEN_DECIMALS,
         mint::authority = market,
     )]
-    pub no_mint: Account<'info, Mint>,
+    pub no_mint: Box<Account<'info, Mint>>,
 
     #[account(
         init,
@@ -58,10 +58,10 @@ pub struct CreateStrikeMarket<'info> {
         token::mint = usdc_mint,
         token::authority = market,
     )]
-    pub vault: Account<'info, TokenAccount>,
+    pub vault: Box<Account<'info, TokenAccount>>,
 
     #[account(address = config.usdc_mint)]
-    pub usdc_mint: Account<'info, Mint>,
+    pub usdc_mint: Box<Account<'info, Mint>>,
 
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,

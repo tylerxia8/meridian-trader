@@ -9,7 +9,7 @@ pub struct RedeemNo<'info> {
     pub user: Signer<'info>,
 
     #[account(seeds = [Config::SEED], bump = config.bump)]
-    pub config: Account<'info, Config>,
+    pub config: Box<Account<'info, Config>>,
 
     #[account(
         seeds = [
@@ -20,27 +20,27 @@ pub struct RedeemNo<'info> {
         ],
         bump = market.bump,
     )]
-    pub market: Account<'info, Market>,
+    pub market: Box<Account<'info, Market>>,
 
     #[account(mut, address = market.no_mint)]
-    pub no_mint: Account<'info, Mint>,
+    pub no_mint: Box<Account<'info, Mint>>,
 
     #[account(mut, address = market.vault)]
-    pub vault: Account<'info, TokenAccount>,
+    pub vault: Box<Account<'info, TokenAccount>>,
 
     #[account(
         mut,
         constraint = user_usdc.mint == config.usdc_mint,
         constraint = user_usdc.owner == user.key(),
     )]
-    pub user_usdc: Account<'info, TokenAccount>,
+    pub user_usdc: Box<Account<'info, TokenAccount>>,
 
     #[account(
         mut,
         constraint = user_no.mint == market.no_mint,
         constraint = user_no.owner == user.key(),
     )]
-    pub user_no: Account<'info, TokenAccount>,
+    pub user_no: Box<Account<'info, TokenAccount>>,
 
     pub token_program: Program<'info, Token>,
 }
