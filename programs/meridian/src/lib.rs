@@ -12,9 +12,10 @@ pub mod state;
 //    are callable directly without a module prefix.
 pub use instructions::*;
 
-// Placeholder. After first `anchor build`, run `anchor keys sync` to replace
-// this with the program ID derived from `target/deploy/meridian-keypair.json`.
-declare_id!("11111111111111111111111111111111");
+// Devnet program ID. Tied to programs/target/deploy/meridian-keypair.json on
+// the deploying machine. If your local keypair differs, run `anchor keys sync`
+// once after cloning to update this line + Anchor.toml in lockstep.
+declare_id!("8EFZSFbtaXUKsJ4ijm2KDgggmTufz4zdrSsv6Eu2mQMa");
 
 // USDC has 6 decimals. We give Yes/No the same so that
 // `vault.amount == yes_mint.supply == no_mint.supply` is the natural
