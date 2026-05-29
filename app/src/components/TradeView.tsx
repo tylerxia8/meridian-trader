@@ -7,6 +7,7 @@ import { SettlementCountdown } from "./SettlementCountdown";
 import { OrderBookView } from "./OrderBookView";
 import { TradePanel } from "./TradePanel";
 import { allowedActions, UserBalances } from "@/lib/positions-client";
+import { solanaExplorerAccountUrl } from "@/lib/explorer";
 import type { LiveMarket } from "@/lib/live-markets";
 
 type StrikeRow = {
@@ -156,7 +157,26 @@ export function TradeView({
             <span className="text-xs text-slate-500">Yes / No on one book</span>
           </div>
           {selected.address ? (
-            <div className="mb-3 truncate text-xs text-slate-500">Market {selected.address}</div>
+            <div className="mb-3 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
+              <a
+                href={solanaExplorerAccountUrl(selected.address)}
+                target="_blank"
+                rel="noreferrer"
+                className="truncate hover:text-slate-300"
+              >
+                Market {shortAddress(selected.address)}
+              </a>
+              {selected.phoenixMarket ? (
+                <a
+                  href={solanaExplorerAccountUrl(selected.phoenixMarket)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="truncate hover:text-slate-300"
+                >
+                  Phoenix {shortAddress(selected.phoenixMarket)}
+                </a>
+              ) : null}
+            </div>
           ) : null}
           <OrderBookView yesPriceCents={selected.yesPriceCents} />
         </section>
@@ -178,6 +198,10 @@ export function TradeView({
       </div>
     </div>
   );
+}
+
+function shortAddress(address: string): string {
+  return `${address.slice(0, 4)}...${address.slice(-4)}`;
 }
 
 async function readTokenAmount(connection: { getTokenAccountBalance: (address: PublicKey) => Promise<{ value: { amount: string } }> }, ata: PublicKey): Promise<bigint> {
