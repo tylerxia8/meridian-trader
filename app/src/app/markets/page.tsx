@@ -1,4 +1,6 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
+import { solanaExplorerAccountUrl } from "@/lib/explorer";
 import { fetchLiveMarkets } from "@/lib/live-markets";
 import { summarizeMarketsByTicker } from "@/lib/market-stats";
 
@@ -19,14 +21,33 @@ const TICKERS = [
 export default async function MarketsPage() {
   const live = await fetchLiveMarkets();
   const counts = live.kind === "live" ? summarizeMarketsByTicker(live.markets) : {};
+  const nowSec = Math.floor(Date.now() / 1000);
+  const activeMarkets =
+    live.kind === "live"
+      ? live.markets
+          .filter((market) => market.outcome === "unsettled" && market.expiryTs > nowSec)
+          .sort((a, b) => a.expiryTs - b.expiryTs || a.ticker.localeCompare(b.ticker) || a.strikeCents - b.strikeCents)
+      : [];
+  const activeConfigured = activeMarkets.filter((market) => market.configuredFeed).length;
+  const activeDemo = activeMarkets.length - activeConfigured;
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Markets</h1>
-      <p className="text-sm text-slate-400">
-        Seven underlyings. Strikes are placed each morning at +/-3%, +/-6%, and +/-9% of the previous
-        close, rounded to the nearest $10.
-      </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Markets</h1>
+          <p className="mt-1 max-w-2xl text-sm text-slate-400">
+            Seven underlyings. Real daily markets use configured Pyth feeds; demo markets are kept visible but labeled.
+          </p>
+        </div>
+        {live.kind === "live" ? (
+          <div className="flex gap-2 text-xs">
+            <Badge tone={activeConfigured > 0 ? "ok" : "muted"}>{activeConfigured} real active</Badge>
+            <Badge tone={activeDemo > 0 ? "warn" : "muted"}>{activeDemo} demo active</Badge>
+          </div>
+        ) : null}
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {TICKERS.map((t) => (
           <Link
@@ -40,11 +61,24 @@ export default async function MarketsPage() {
             </div>
             <div className="mt-3 text-sm text-slate-400">
               {live.kind === "live" ? (
-                <span>
-                  {counts[t.symbol]?.active ?? 0} active
-                  <span className="text-slate-600"> / </span>
-                  {counts[t.symbol]?.settled ?? 0} settled
-                </span>
+                <div className="space-y-2">
+                  <div>
+                    {counts[t.symbol]?.active ?? 0} active
+                    <span className="text-slate-600"> / </span>
+                    {counts[t.symbol]?.settled ?? 0} settled
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    <Badge tone={(counts[t.symbol]?.configuredFeed ?? 0) > 0 ? "ok" : "muted"}>
+                      {counts[t.symbol]?.configuredFeed ?? 0} real
+                    </Badge>
+                    <Badge tone={(counts[t.symbol]?.fakeOrUnconfiguredFeed ?? 0) > 0 ? "warn" : "muted"}>
+                      {counts[t.symbol]?.fakeOrUnconfiguredFeed ?? 0} demo
+                    </Badge>
+                    <Badge tone={(counts[t.symbol]?.phoenixLinked ?? 0) > 0 ? "info" : "muted"}>
+                      {counts[t.symbol]?.phoenixLinked ?? 0} Phoenix
+                    </Badge>
+                  </div>
+                </div>
               ) : (
                 "View active strikes ->"
               )}
@@ -52,9 +86,93 @@ export default async function MarketsPage() {
           </Link>
         ))}
       </div>
+
+      {live.kind === "live" ? (
+        <section className="rounded-lg border border-slate-800 bg-panel p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-medium text-slate-300">Active Markets</h2>
+            <Link href="/status" className="text-xs text-slate-400 hover:text-white">
+              Full status
+            </Link>
+          </div>
+          {activeMarkets.length === 0 ? (
+            <p className="text-sm text-slate-500">No active markets. Run the morning job or demo market script to create the next batch.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="text-xs uppercase text-slate-500">
+                  <tr>
+                    <th className="py-2">Market</th>
+                    <th>Feed</th>
+                    <th>Phoenix</th>
+                    <th>Expiry</th>
+                    <th>Account</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800">
+                  {activeMarkets.map((market) => (
+                    <tr key={market.address}>
+                      <td className="py-2">
+                        <Link href={`/trade/${market.ticker}`} className="text-slate-200 hover:text-white">
+                          {market.ticker} {">"} ${(market.strikeCents / 100).toFixed(0)}
+                        </Link>
+                      </td>
+                      <td>
+                        <Badge tone={market.configuredFeed ? "ok" : "warn"}>
+                          {market.configuredFeed ? "configured" : "demo/fake"}
+                        </Badge>
+                      </td>
+                      <td>
+                        <Badge tone={market.phoenixMarket ? "info" : "muted"}>
+                          {market.phoenixMarket ? "linked" : "none"}
+                        </Badge>
+                      </td>
+                      <td>{formatTime(market.expiryTs)}</td>
+                      <td>
+                        <a
+                          href={solanaExplorerAccountUrl(market.address)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-mono text-xs text-slate-500 hover:text-slate-300"
+                        >
+                          {shortAddress(market.address)}
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      ) : null}
+
       {live.kind === "unavailable" ? (
         <p className="text-xs text-slate-500">Live markets unavailable: {live.reason}. Showing ticker list.</p>
       ) : null}
     </div>
   );
+}
+
+function Badge({ children, tone }: { children: ReactNode; tone: "ok" | "warn" | "info" | "muted" }) {
+  const classes = {
+    ok: "border-yes/30 bg-yes/10 text-yes",
+    warn: "border-amber-400/30 bg-amber-400/10 text-amber-300",
+    info: "border-sky-400/30 bg-sky-400/10 text-sky-300",
+    muted: "border-slate-700 bg-slate-800/40 text-slate-400",
+  };
+  return <span className={`rounded border px-2 py-0.5 ${classes[tone]}`}>{children}</span>;
+}
+
+function formatTime(ts: number): string {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(ts * 1000));
+}
+
+function shortAddress(address: string): string {
+  return `${address.slice(0, 4)}...${address.slice(-4)}`;
 }

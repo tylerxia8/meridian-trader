@@ -46,10 +46,11 @@ export function TradeView({
   liveMarkets?: LiveMarket[];
   liveReason?: string | null;
 }) {
+  const nowSec = Math.floor(Date.now() / 1000);
   const strikes = useMemo(() => {
     const live = liveMarkets
       .filter((market) => market.ticker === ticker)
-      .sort((a, b) => a.strikeCents - b.strikeCents)
+      .sort((a, b) => marketRank(a, nowSec) - marketRank(b, nowSec) || a.strikeCents - b.strikeCents)
       .map<StrikeRow>((market) => ({
         strikeCents: market.strikeCents,
         yesPriceCents:
@@ -70,7 +71,7 @@ export function TradeView({
         bestAskSize: market.bestAskSize,
       }));
     return live.length > 0 ? live : mockStrikesFor(ticker);
-  }, [liveMarkets, ticker]);
+  }, [liveMarkets, nowSec, ticker]);
   const [selected, setSelected] = useState(strikes[Math.floor(strikes.length / 2)]);
   const wallet = useWallet();
   const { connection } = useConnection();
@@ -153,7 +154,7 @@ export function TradeView({
                   </div>
                   {s.outcome ? (
                     <div className="mt-1 flex justify-between text-xs text-slate-500">
-                      <span>{outcomeLabel(s.outcome)}</span>
+                      <span>{marketStateLabel(s, nowSec)}</span>
                       <span>{s.phoenixMarket ? "Phoenix linked" : "No Phoenix"}</span>
                     </div>
                   ) : null}
@@ -209,6 +210,7 @@ export function TradeView({
             marketAddress={selected.address ?? null}
             phoenixMarket={selected.phoenixMarket ?? null}
             outcome={selected.outcome ?? null}
+            expiryTs={selected.expiryTs ?? null}
             balances={balances}
             balanceStatus={balanceStatus}
             allowed={allowed}
@@ -218,6 +220,18 @@ export function TradeView({
       </div>
     </div>
   );
+}
+
+function marketRank(market: LiveMarket, nowSec: number): number {
+  if (market.outcome === "unsettled" && market.expiryTs > nowSec && market.configuredFeed) return 0;
+  if (market.outcome === "unsettled" && market.expiryTs > nowSec) return 1;
+  if (market.outcome === "unsettled") return 2;
+  return 3;
+}
+
+function marketStateLabel(strike: StrikeRow, nowSec: number): string {
+  if (strike.outcome === "unsettled" && strike.expiryTs && strike.expiryTs <= nowSec) return "Expired";
+  return outcomeLabel(strike.outcome ?? "unsettled");
 }
 
 function shortAddress(address: string): string {

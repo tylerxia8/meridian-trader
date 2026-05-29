@@ -12,6 +12,7 @@ interface Props {
   marketAddress: string | null;
   phoenixMarket: string | null;
   outcome: "unsettled" | "yesWins" | "noWins" | null;
+  expiryTs?: number | null;
   balances: UserBalances;
   balanceStatus: string | null;
   allowed: AllowedAction[];
@@ -25,6 +26,7 @@ export function TradePanel({
   marketAddress,
   phoenixMarket,
   outcome,
+  expiryTs,
   balances,
   balanceStatus,
   allowed,
@@ -35,9 +37,12 @@ export function TradePanel({
   const { connected, publicKey, sendTransaction } = useWallet();
   const { connection } = useConnection();
   const noPriceCents = 100 - yesPriceCents;
+  const expired = Boolean(expiryTs && expiryTs <= Math.floor(Date.now() / 1000));
   const unavailableReason =
     !marketAddress
       ? "Select a live market before trading."
+      : expired && outcome === "unsettled"
+        ? "This market has expired and is waiting for settlement."
       : outcome && outcome !== "unsettled"
         ? "This market is already settled."
         : !phoenixMarket

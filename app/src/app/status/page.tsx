@@ -23,6 +23,12 @@ export default async function StatusPage() {
   const pending = live.markets
     .filter((market) => market.outcome === "unsettled" && market.expiryTs <= Math.floor(Date.now() / 1000))
     .sort((a, b) => a.ticker.localeCompare(b.ticker) || a.strikeCents - b.strikeCents);
+  const pendingConfigured = pending.filter((market) => market.configuredFeed);
+  const pendingDemo = pending.filter((market) => !market.configuredFeed);
+  const active = live.markets.filter(
+    (market) => market.outcome === "unsettled" && market.expiryTs > Math.floor(Date.now() / 1000)
+  );
+  const activeConfigured = active.filter((market) => market.configuredFeed);
   const recentlySettled = live.markets
     .filter((market) => market.outcome !== "unsettled")
     .sort((a, b) => b.settlementTs - a.settlementTs)
@@ -49,8 +55,15 @@ export default async function StatusPage() {
         <Metric label="Total Markets" value={stats.total} />
         <Metric label="Configured Feeds" value={stats.configuredFeed} />
         <Metric label="Fake/Unconfigured" value={stats.fakeOrUnconfiguredFeed} />
-        <Metric label="Settlement Backlog" value={pending.filter((market) => market.configuredFeed).length} />
+        <Metric label="Settlement Backlog" value={pendingConfigured.length} />
       </section>
+
+      <ActionPanel
+        activeConfigured={activeConfigured.length}
+        activeDemo={active.length - activeConfigured.length}
+        pendingConfigured={pendingConfigured.length}
+        pendingDemo={pendingDemo.length}
+      />
 
       <section className="rounded-lg border border-slate-800 bg-panel p-4">
         <h2 className="mb-3 text-sm font-medium text-slate-300">By Ticker</h2>
@@ -89,11 +102,19 @@ export default async function StatusPage() {
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
-        <StatusList title="Expired Pending" empty="No configured-feed settlement backlog remains.">
-          {pending.map((market) => (
+        <StatusList title="Configured Pending" empty="No configured-feed settlement backlog remains.">
+          {pendingConfigured.map((market) => (
             <MarketStatusRow key={market.address} market={market} />
           ))}
         </StatusList>
+        <StatusList title="Demo/Fake Pending" empty="No old demo markets are pending.">
+          {pendingDemo.map((market) => (
+            <MarketStatusRow key={market.address} market={market} />
+          ))}
+        </StatusList>
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-2">
         <StatusList title="Recent Settlements" empty="No settled markets yet.">
           {recentlySettled.map((market) => (
             <MarketStatusRow key={market.address} market={market} />
@@ -101,6 +122,48 @@ export default async function StatusPage() {
         </StatusList>
       </section>
     </div>
+  );
+}
+
+function ActionPanel({
+  activeConfigured,
+  activeDemo,
+  pendingConfigured,
+  pendingDemo,
+}: {
+  activeConfigured: number;
+  activeDemo: number;
+  pendingConfigured: number;
+  pendingDemo: number;
+}) {
+  const message =
+    pendingConfigured > 0
+      ? "Configured-feed markets are expired and ready for settlement."
+      : activeConfigured > 0
+        ? "Real configured-feed markets are active."
+        : activeDemo > 0
+          ? "Only demo/fake-feed markets are active."
+          : "No active markets are live.";
+  const command =
+    pendingConfigured > 0
+      ? "SETTLEMENT_MAX_RETRIES=1 npm run settle:markets"
+      : activeConfigured > 0
+        ? "npm run demo:status"
+        : "npm run create:markets";
+
+  return (
+    <section className="rounded-lg border border-slate-800 bg-panel p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-medium text-slate-300">Operator Cue</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            {message}
+            {pendingDemo > 0 ? ` ${pendingDemo} old demo market${pendingDemo === 1 ? "" : "s"} remain visible for auditability.` : ""}
+          </p>
+        </div>
+        <code className="rounded border border-slate-800 px-3 py-2 text-xs text-slate-400">{command}</code>
+      </div>
+    </section>
   );
 }
 
