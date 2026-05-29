@@ -14,19 +14,31 @@
     "test:program:skip-deploy": "anchor test --skip-deploy",
     "deploy:devnet": "anchor deploy --provider.cluster devnet",
     "lifecycle:demo": "tsx scripts/lifecycle.ts",
-    "create:markets": "tsx scripts/create-markets.ts",
-    "settle:markets": "tsx scripts/settle-markets.ts",
+    "config:update": "tsx scripts/update-config.ts",
+    "fast:demo": "tsx scripts/fast-demo.ts",
+    "demo:market": "tsx scripts/create-demo-market.ts",
+    "phoenix:probe": "tsx scripts/phoenix-probe.ts",
+    "phoenix:link": "tsx scripts/link-phoenix.ts",
+    "phoenix:create": "tsx scripts/create-phoenix-market.ts",
+    "phoenix:smoke": "tsx scripts/phoenix-smoke.ts",
+    "pyth:settle": "tsx scripts/pyth-settle-smoke.ts",
+    "create:markets": "npm run start --workspace=automation -- morning",
+    "settle:markets": "npm run start --workspace=automation -- settlement",
     "dev:app": "npm run dev --workspace=app",
     "dev:automation": "npm run dev --workspace=automation",
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "^1.0.2",
-    "@solana/spl-token": "^0.4.6",
-    "@solana/web3.js": "^1.95.0"
+    "@coral-xyz/anchor": "^0.32.1",
+    "@solana/spl-token": "^0.4.14",
+    "@solana/web3.js": "^1.95.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "rpc-websockets": "7.10.0"
   },
   "devDependencies": {
+    "@types/bn.js": "^5.2.0",
     "@types/chai": "^4.3.0",
     "@types/mocha": "^10.0.0",
     "@types/node": "^20.11.0",
@@ -38,5 +50,11 @@
   },
   "engines": {
     "node": ">=20.0.0"
+  },
+  "overrides": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "@types/react": "18.3.29",
+    "@types/react-dom": "18.3.7"
   }
 }

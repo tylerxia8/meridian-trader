@@ -6,7 +6,9 @@
 // will fail-with-already-in-use for any market created earlier. We log and
 // continue.
 import * as anchor from "@coral-xyz/anchor";
+import BN from "bn.js";
 import { Config, TICKERS } from "../config.js";
+import { readKeypairBytes } from "../config.js";
 import { ProgramContext } from "../program.js";
 import { logger } from "../logger.js";
 import { isNyseTradingDay } from "../calendar.js";
@@ -53,13 +55,37 @@ function etOffsetMinutes(d: Date): number {
   return h * 60 + (h < 0 ? -m : m);
 }
 
+function etMinutes(d: Date): number {
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  const parts: Record<string, string> = {};
+  for (const p of fmt.formatToParts(d)) parts[p.type] = p.value;
+  return Number(parts.hour) * 60 + Number(parts.minute);
+}
+
+export function isAfterRegularOpenEt(d: Date): boolean {
+  return etMinutes(d) >= 9 * 60 + 30;
+}
+
 export async function runMorningJob(cfg: Config, ctx: ProgramContext): Promise<void> {
   const now = new Date();
   if (!isNyseTradingDay(now)) {
     logger.info({ date: now.toISOString() }, "skipping morning job: not a trading day");
     return;
   }
+  if (!cfg.morningAllowAfterOpen && isAfterRegularOpenEt(now)) {
+    logger.warn(
+      { date: now.toISOString() },
+      "skipping morning job after regular market open; set MORNING_ALLOW_AFTER_OPEN=true to override"
+    );
+    return;
+  }
 
+  const admin = anchor.web3.Keypair.fromSecretKey(readKeypairBytes(cfg.adminKeypairPath));
   const prices = await fetchLatestPrices(cfg.hermesUrl, cfg.feedIds);
   const expiry = todaysExpiryTs(now);
   const configKey = anchor.web3.PublicKey.findProgramAddressSync(
@@ -90,8 +116,8 @@ export async function runMorningJob(cfg: Config, ctx: ProgramContext): Promise<v
           [
             Buffer.from("market"),
             Buffer.from(tb),
-            new anchor.BN(strike).toArrayLike(Buffer, "le", 8),
-            new anchor.BN(expiry).toArrayLike(Buffer, "le", 8),
+            new BN(strike).toArrayLike(Buffer, "le", 8),
+            new BN(expiry).toArrayLike(Buffer, "le", 8),
           ],
           ctx.program.programId
         );
@@ -109,9 +135,9 @@ export async function runMorningJob(cfg: Config, ctx: ProgramContext): Promise<v
         );
 
         await ctx.program.methods
-          .createStrikeMarket(tb, new anchor.BN(strike), new anchor.BN(expiry), feedIdBytes)
+          .createStrikeMarket(tb, new BN(strike), new BN(expiry), feedIdBytes)
           .accounts({
-            admin: ctx.wallet.publicKey,
+            admin: admin.publicKey,
             config: configKey,
             market,
             yesMint,
@@ -122,6 +148,7 @@ export async function runMorningJob(cfg: Config, ctx: ProgramContext): Promise<v
             systemProgram: anchor.web3.SystemProgram.programId,
             rent: anchor.web3.SYSVAR_RENT_PUBKEY,
           })
+          .signers([admin])
           .rpc();
         logger.info({ ticker: t, strike, market: market.toBase58() }, "market created");
       } catch (err: any) {

@@ -2,35 +2,35 @@
 
 Per PRD requirement: short risks/limitations note, no regulatory or compliance claims.
 
-## Known scope deviation (v1)
+## Known scope note (v1)
 
-`settle_market` (the permissionless Pyth-oracle settlement path) is currently stubbed because `pyth-solana-receiver-sdk 1.2.0` has an internal borsh-version conflict that prevents compilation under Anchor 1.0. **`admin_settle` is the only working settlement path until Pyth ships a compatible SDK.** Outcome correctness is unaffected — admin_settle applies the same `finalize_settlement` rule — but settlement requires the admin signer rather than being permissionless. See [ARCHITECTURE.md § Pyth oracle](ARCHITECTURE.md) for restore steps.
+`settle_market` is implemented without a direct Rust dependency on `pyth-solana-receiver-sdk` because that crate currently pulls a different Anchor version than this program. The program manually parses the posted Pyth Receiver `PriceUpdateV2` layout and verifies owner, full verification, feed id, staleness, and confidence ratio. This keeps settlement permissionless while avoiding an Anchor dependency conflict.
 
 ## Technical risks
 
 | Risk | Mitigation | Residual |
 |---|---|---|
 | Oracle returns stale or wide-confidence price at 4pm ET | Staleness threshold (5min default), confidence-ratio check (0.5% default), 15min retry window | If Pyth is down for >15min, requires admin override with 1h delay |
-| Admin keypair compromise | Admin powers limited to: add strikes, pause/unpause, override-settle (with time delay). Cannot drain vault. | Admin can mis-settle after 1h delay → users could redeem incorrectly. Mitigation: multisig admin in mainnet deployment. |
+| Admin keypair compromise | Admin powers limited to: add strikes, pause/unpause, override-settle (with time delay). Cannot drain vault. | Admin can mis-settle after 1h delay; mitigation is multisig admin before any mainnet deployment |
 | Phoenix downtime during trading hours | Trading pauses; mint/redeem unaffected | Users can still close positions by redeeming a Yes+No pair for $1 |
-| Solana network congestion | Helius/Triton RPC for higher throughput; retry with backoff | At-edge: settlement could miss the 10min window |
-| At-strike ambiguity (oracle exactly == strike) | PRD specifies "at or above" → Yes wins | Deterministic |
-| Rounding errors with low-priced stocks | Strike dedup after $10 rounding | AAPL near $230 may collapse ±3% and ±6% to same strike (intended) |
+| Solana network congestion | Helius/Triton RPC for higher throughput; retry with backoff | Settlement could miss the 10min target window |
+| At-strike ambiguity (oracle exactly == strike) | PRD specifies "at or above"; Yes wins | Deterministic |
+| Rounding errors with low-priced stocks | Strike dedup after $10 rounding | AAPL near $230 may collapse +/-3% and +/-6% to the same strike |
 
 ## Operational risks
 
-- **Automation wallet runs out of SOL** → markets don't get created/settled. Mitigation: balance monitoring + alerting.
-- **Code bug in `mint_pair` or `redeem`** → invariant violation. Mitigation: exhaustive unit + property-based tests for the $1 invariant.
-- **NYSE holidays / early closes** → strike timing off. Mitigation: NYSE calendar in automation; settlement uses oracle timestamp, not wall-clock.
+- Automation wallet runs out of SOL: markets do not get created or settled. Mitigation: balance monitoring and alerts.
+- Code bug in `mint_pair` or `redeem`: invariant violation. Mitigation: exhaustive unit and property tests for the $1 invariant.
+- NYSE holidays or early closes: strike timing can be off. Mitigation: NYSE calendar in automation; settlement uses oracle timestamp, not wall-clock alone.
 
 ## Known limitations (v1)
 
 - 7 tickers (MAG7) only.
-- 6 strikes per ticker per day (3 above, 3 below at ±3/6/9%), deduplicated.
+- 6 strikes per ticker per day (3 above, 3 below at +/-3/6/9%), deduplicated.
 - Same-day expiry only (0DTE).
 - USDC-only collateral.
 - No portfolio margining; each contract collateralized 1:1.
-- No fees (vault must equal $1 × pairs outstanding exactly).
+- No fees; vault must equal $1 times pairs outstanding exactly.
 - English UI only.
 
 ## Not claimed

@@ -5,11 +5,16 @@ import * as anchor from "@coral-xyz/anchor";
 import { AnchorProvider, BN, Program } from "@coral-xyz/anchor";
 import {
   TOKEN_PROGRAM_ID,
-  ASSOCIATED_TOKEN_PROGRAM_ID,
+  createAssociatedTokenAccountIdempotentInstruction,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
 import { PublicKey, SystemProgram, TransactionInstruction } from "@solana/web3.js";
-import type { Meridian } from "../../../target/types/meridian";
+import type { Idl } from "@coral-xyz/anchor";
+
+// The generated Anchor type lives under target/types after `anchor build`.
+// Keep this wrapper buildable before codegen so the frontend can typecheck
+// from a fresh clone.
+export type Meridian = Idl;
 
 export type Ticker = "AAPL" | "MSFT" | "GOOGL" | "AMZN" | "NVDA" | "META" | "TSLA";
 
@@ -185,19 +190,19 @@ export class MeridianClient {
   ataIxs(market: MarketKeys, user: PublicKey, payer: PublicKey): TransactionInstruction[] {
     const ata = (mint: PublicKey) => getAssociatedTokenAddressSync(mint, user);
     return [
-      anchor.utils.token.createAssociatedTokenAccountIdempotentInstruction(
+      createAssociatedTokenAccountIdempotentInstruction(
         payer,
         ata(this.usdcMint),
         user,
         this.usdcMint
       ),
-      anchor.utils.token.createAssociatedTokenAccountIdempotentInstruction(
+      createAssociatedTokenAccountIdempotentInstruction(
         payer,
         ata(market.yesMint),
         user,
         market.yesMint
       ),
-      anchor.utils.token.createAssociatedTokenAccountIdempotentInstruction(
+      createAssociatedTokenAccountIdempotentInstruction(
         payer,
         ata(market.noMint),
         user,
@@ -207,10 +212,10 @@ export class MeridianClient {
   }
 
   async fetchMarket(market: PublicKey) {
-    return this.program.account.market.fetch(market);
+    return (this.program.account as any).market.fetch(market);
   }
 
   async fetchConfig() {
-    return this.program.account.config.fetch(this.config);
+    return (this.program.account as any).config.fetch(this.config);
   }
 }

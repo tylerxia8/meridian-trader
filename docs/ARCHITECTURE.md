@@ -54,15 +54,15 @@ External dependencies:
 
 ### 3. Pyth oracle
 
-**Choice:** Pyth Network's pull oracle (`pyth-solana-receiver-sdk`) — *intended* approach. **Currently stubbed.**
+**Choice:** Pyth Network's pull oracle, with direct on-chain parsing of posted Pyth Receiver `PriceUpdateV2` accounts.
 
 **Why Pyth was chosen:** Pyth provides MAG7 equity feeds with explicit confidence intervals (required for the PRD's confidence check). Pull model gives control over when the price is posted on-chain — important for the precise 4 pm ET settlement window.
 
-**Why it's stubbed today:** `pyth-solana-receiver-sdk v1.2.0` has an internal borsh-version mismatch (its `PriceFeedMessage` uses borsh 0.10.x while its `#[account]` derive on `PriceUpdateV2` expects borsh 1.x, dragged in by Anchor 1.0). The crate fails to compile. Until Pyth ships a version compatible with Anchor 1.0, `settle_market` returns an error and **`admin_settle` is the only settlement path**. `admin_settle` is functionally complete — it validates expiry + override delay and uses the same `finalize_settlement` outcome logic — so this is a strictly-temporary regression of the *permissionless* settlement guarantee, not a correctness regression.
+**Implementation note:** The Rust program intentionally does not depend on `pyth-solana-receiver-sdk`, because the current crate pulls a different Anchor version than Meridian. Instead, `settle_market` accepts the posted receiver account as `UncheckedAccount`, verifies the owner is the Pyth Receiver program, checks the Anchor discriminator for `PriceUpdateV2`, parses the Borsh layout, and validates full verification, feed id, freshness, and confidence ratio before writing the outcome.
 
-**When to restore:** track Pyth's GitHub for a release that pins borsh 1.x across both `pythnet-sdk` and `pyth-solana-receiver-sdk`. Restore is a one-line Cargo.toml change plus uncomment the `get_price_no_older_than` call in `settle_market.rs`.
+**When to revisit:** if Pyth ships a receiver SDK that uses the same Anchor major version as Meridian, replace the manual parser with the SDK's `PriceUpdateV2` account type and `get_price_no_older_than` helper.
 
-**Alternatives if Pyth stays broken:** Switchboard (less mature equity confidence intervals), Chainlink (thinner Solana equity coverage), or hand-roll a Pyth account parser using the wire format spec from Pyth docs.
+**Alternatives if Pyth becomes unsuitable:** Switchboard (less mature equity confidence intervals) or Chainlink (thinner Solana equity coverage).
 
 ### 4. One book, two perspectives
 

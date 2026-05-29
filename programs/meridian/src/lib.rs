@@ -15,7 +15,7 @@ pub use instructions::*;
 // Devnet program ID. Tied to programs/target/deploy/meridian-keypair.json on
 // the deploying machine. If your local keypair differs, run `anchor keys sync`
 // once after cloning to update this line + Anchor.toml in lockstep.
-declare_id!("8EFZSFbtaXUKsJ4ijm2KDgggmTufz4zdrSsv6Eu2mQMa");
+declare_id!("6SaMPmMDFZD6pg4NwK13Cph6YSSiZQwzBsbhrroRUJdy");
 
 // USDC has 6 decimals. We give Yes/No the same so that
 // `vault.amount == yes_mint.supply == no_mint.supply` is the natural
@@ -34,7 +34,12 @@ pub mod meridian {
         max_conf_ratio_bps: u16,
         admin_override_delay_secs: u32,
     ) -> Result<()> {
-        initialize_config_handler(ctx, max_staleness_secs, max_conf_ratio_bps, admin_override_delay_secs)
+        initialize_config_handler(
+            ctx,
+            max_staleness_secs,
+            max_conf_ratio_bps,
+            admin_override_delay_secs,
+        )
     }
 
     /// Create one strike market: Yes mint, No mint, USDC vault, and the
@@ -47,7 +52,13 @@ pub mod meridian {
         expiry_ts: i64,
         price_feed_id: [u8; 32],
     ) -> Result<()> {
-        create_strike_market_handler(ctx, ticker, strike_price_usd_cents, expiry_ts, price_feed_id)
+        create_strike_market_handler(
+            ctx,
+            ticker,
+            strike_price_usd_cents,
+            expiry_ts,
+            price_feed_id,
+        )
     }
 
     /// Deposit `amount` of USDC (raw units; 1.00 USDC = 1_000_000). The
@@ -64,15 +75,16 @@ pub mod meridian {
         redeem_pair_handler(ctx, amount)
     }
 
-    /// Currently stubbed (returns an error). Pyth SDK is not Anchor-1.0
-    /// compatible yet — see docs/ARCHITECTURE.md. Use admin_settle instead.
+    /// Permissionless oracle settlement. Reads a posted Pyth Receiver
+    /// PriceUpdateV2 account, verifies feed/freshness/confidence, then writes
+    /// the immutable outcome.
     pub fn settle_market(ctx: Context<SettleMarket>) -> Result<()> {
         settle_market_handler(ctx)
     }
 
     /// Admin override. Enforces a time delay
-    /// (config.admin_override_delay_secs) since market expiry. Currently
-    /// the only working settlement path. Outcome is immutable once written.
+    /// (config.admin_override_delay_secs) since market expiry. This is the
+    /// fallback settlement path. Outcome is immutable once written.
     pub fn admin_settle(ctx: Context<AdminSettle>, price_usd_cents: u64) -> Result<()> {
         admin_settle_handler(ctx, price_usd_cents)
     }
@@ -90,8 +102,27 @@ pub mod meridian {
     /// Admin: associate this strike's Phoenix CLOB market (Yes vs USDC)
     /// with the Market account. The Phoenix market itself is created
     /// off-chain via the Phoenix SDK before this is called.
-    pub fn link_phoenix_market(ctx: Context<LinkPhoenixMarket>, phoenix_market: Pubkey) -> Result<()> {
+    pub fn link_phoenix_market(
+        ctx: Context<LinkPhoenixMarket>,
+        phoenix_market: Pubkey,
+    ) -> Result<()> {
         link_phoenix_market_handler(ctx, phoenix_market)
+    }
+
+    /// Admin: update oracle freshness/confidence and delayed override
+    /// parameters without migrating the config PDA.
+    pub fn update_config(
+        ctx: Context<AdminUpdateConfig>,
+        max_staleness_secs: u32,
+        max_conf_ratio_bps: u16,
+        admin_override_delay_secs: u32,
+    ) -> Result<()> {
+        update_config_handler(
+            ctx,
+            max_staleness_secs,
+            max_conf_ratio_bps,
+            admin_override_delay_secs,
+        )
     }
 
     /// Admin: halt mint_pair and all redeem operations. Settlement is

@@ -74,8 +74,28 @@ describe("meridian", () => {
   let configKey: PublicKey;
 
   async function airdrop(pk: PublicKey, sol: number) {
-    const sig = await connection.requestAirdrop(pk, sol * LAMPORTS_PER_SOL);
-    await connection.confirmTransaction(sig, "confirmed");
+    const lamports = sol * LAMPORTS_PER_SOL;
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= 5; attempt++) {
+      try {
+        const sig = await connection.requestAirdrop(pk, lamports);
+        const latestBlockhash = await connection.getLatestBlockhash();
+        await connection.confirmTransaction(
+          {
+            signature: sig,
+            ...latestBlockhash,
+          },
+          "confirmed"
+        );
+        return;
+      } catch (err) {
+        lastError = err;
+        await sleep(300 * attempt);
+      }
+    }
+
+    throw lastError;
   }
 
   before(async () => {
@@ -106,6 +126,36 @@ describe("meridian", () => {
     expect(cfg.maxStalenessSecs).to.eq(MAX_STALENESS_SECS);
     expect(cfg.maxConfRatioBps).to.eq(MAX_CONF_RATIO_BPS);
     expect(cfg.adminOverrideDelaySecs).to.eq(ADMIN_OVERRIDE_DELAY_SECS);
+  });
+
+  it("update_config is admin-only and updates oracle params", async () => {
+    await program.methods
+      .updateConfig(MAX_STALENESS_SECS + 60, MAX_CONF_RATIO_BPS + 5, ADMIN_OVERRIDE_DELAY_SECS + 1)
+      .accounts({ admin: admin.publicKey, config: configKey })
+      .signers([admin])
+      .rpc();
+
+    const updated = await program.account.config.fetch(configKey);
+    expect(updated.maxStalenessSecs).to.eq(MAX_STALENESS_SECS + 60);
+    expect(updated.maxConfRatioBps).to.eq(MAX_CONF_RATIO_BPS + 5);
+    expect(updated.adminOverrideDelaySecs).to.eq(ADMIN_OVERRIDE_DELAY_SECS + 1);
+
+    try {
+      await program.methods
+        .updateConfig(MAX_STALENESS_SECS, MAX_CONF_RATIO_BPS, ADMIN_OVERRIDE_DELAY_SECS)
+        .accounts({ admin: user.publicKey, config: configKey })
+        .signers([user])
+        .rpc();
+      expect.fail();
+    } catch (e: any) {
+      expect(e.toString()).to.match(/NotAdmin|raw constraint/i);
+    }
+
+    await program.methods
+      .updateConfig(MAX_STALENESS_SECS, MAX_CONF_RATIO_BPS, ADMIN_OVERRIDE_DELAY_SECS)
+      .accounts({ admin: admin.publicKey, config: configKey })
+      .signers([admin])
+      .rpc();
   });
 
   describe("mint/redeem invariants (META $680, long-lived market)", () => {
@@ -426,6 +476,21 @@ describe("meridian", () => {
     });
 
     it("admin_settle: before override delay → AdminOverrideTooEarly", async () => {
+      const ctx = await setupShortLivedMarket("GOOGL", 12_000n);
+      await sleep(4500);
+      try {
+        await program.methods
+          .adminSettle(new BN(0))
+          .accounts({ admin: admin.publicKey, config: configKey, market: ctx.market })
+          .signers([admin])
+          .rpc();
+        expect.fail();
+      } catch (e: any) {
+        expect(e.toString()).to.match(/InvalidSettlementPrice/);
+      }
+    });
+
+    it("admin_settle: before override delay -> AdminOverrideTooEarly", async () => {
       const ctx = await setupShortLivedMarket("AMZN", 18_000n);
       // Don't sleep — call immediately, before expiry + delay.
       try {

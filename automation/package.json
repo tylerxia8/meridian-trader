@@ -7,13 +7,14 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
+    "test": "tsx --test src/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "^1.0.2",
+    "@coral-xyz/anchor": "^0.32.1",
     "@pythnetwork/price-service-client": "^1.9.0",
     "@pythnetwork/pyth-solana-receiver": "^0.7.0",
-    "@solana/spl-token": "^0.4.6",
+    "@solana/spl-token": "^0.4.14",
     "@solana/web3.js": "^1.95.0",
     "dotenv": "^16.4.5",
     "node-cron": "^3.0.3",

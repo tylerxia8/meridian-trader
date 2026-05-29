@@ -28,6 +28,7 @@ pub fn admin_settle_handler(ctx: Context<AdminSettle>, price_usd_cents: u64) -> 
     let market = &mut ctx.accounts.market;
     let config = &ctx.accounts.config;
     require!(market.outcome == Outcome::Unsettled, MeridianError::AlreadySettled);
+    require!(price_usd_cents > 0, MeridianError::InvalidSettlementPrice);
 
     let now = Clock::get()?.unix_timestamp;
     let earliest = market

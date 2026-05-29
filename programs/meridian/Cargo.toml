@@ -19,7 +19,7 @@ idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 [dependencies]
 anchor-lang = { version = "1.0.2", features = ["init-if-needed"] }
 anchor-spl = { version = "1.0.2", features = ["metadata"] }
-# pyth-solana-receiver-sdk is intentionally NOT a dep. v1.2.0's PriceUpdateV2
-# fails to compile under Anchor 1.0 (dual-borsh trait mismatch internal to
-# Pyth's crate). settle_market is stubbed; admin_settle handles all settlement
-# paths until a compatible Pyth SDK version ships. See docs/ARCHITECTURE.md.
+# pyth-solana-receiver-sdk is intentionally NOT a dep. Its current crate pulls
+# a different Anchor version than this program. settle_market manually parses
+# the posted PriceUpdateV2 account layout and verifies owner/feed/staleness/
+# confidence instead. See docs/ARCHITECTURE.md.

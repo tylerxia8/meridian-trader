@@ -2,7 +2,7 @@
 
 A non-custodial Solana dApp for trading binary outcome contracts on the daily closing prices of MAG7 US equities (AAPL, MSFT, GOOGL, AMZN, NVDA, META, TSLA). Each contract asks *"Will [STOCK] close at or above [PRICE] today?"* and pays $1 USDC if yes, $0 if no. Contracts expire same-day (0DTE) and settle at 4:00 PM ET via the Pyth oracle. Yes and No tokens trade on Phoenix CLOB.
 
-**Status:** scaffolding (Phase 1).
+**Status:** compile-clean frontend/automation with a working local lifecycle demo, devnet Phoenix market creation/linking, and a live Phoenix order smoke. On-chain Pyth settlement is implemented by manually parsing posted Pyth Receiver `PriceUpdateV2` accounts; `admin_settle` remains the delayed fallback for demos and oracle outages.
 
 ## Architecture
 
@@ -100,14 +100,14 @@ avm install 0.30.1 && avm use 0.30.1
 Before running anything, verify the program compiles and the tests pass:
 
 ```bash
-npm install                          # installs root + workspace deps
+npm install --ignore-scripts         # native Windows avoids transitive postinstall shell issues
 anchor build                         # compiles the Rust program
 anchor keys sync                     # syncs the on-chain program ID into lib.rs + Anchor.toml
 anchor test                          # runs the Anchor TS integration tests
 cd automation && npm test            # runs the pure-TS strike calc tests
 ```
 
-If `anchor build` complains about the Pyth SDK API, drop me a note with the error — first compile against the real SDK may need a tiny tweak.
+If `anchor build` complains about generated IDs, run `anchor keys sync` and rebuild.
 
 ## Quick start (devnet)
 
@@ -131,9 +131,41 @@ anchor build
 anchor deploy --provider.cluster devnet
 # Copy the printed program id into MERIDIAN_PROGRAM_ID in .env
 
-# 4. Run the end-to-end lifecycle demo
-#    create → mint → trade (or admin_settle stand-in) → redeem
+# 4. Run the lifecycle smoke demo
+#    preflight -> initialize config if missing -> create demo market
+#    -> mint/redeem if the admin wallet has demo USDC -> delayed admin_settle
+#    -> winning-token redemption from a second wallet
 npm run lifecycle:demo
+
+# Optional: update deployed config parameters without reinitializing the PDA.
+# For a full same-session admin-settle demo:
+# ADMIN_OVERRIDE_DELAY_SECS=1 npm run config:update
+# Restore the PRD default afterward:
+# ADMIN_OVERRIDE_DELAY_SECS=3600 npm run config:update
+
+# Local fast path: starts a temporary local validator, deploys Meridian,
+# creates demo USDC, and runs the lifecycle smoke demo end-to-end.
+npm run fast:demo
+
+# Phoenix integration checks
+npm run phoenix:probe
+# To create a fresh non-expired Meridian demo market:
+# npm run demo:market
+# To create and link a Phoenix Yes/USDC market for an existing Meridian market:
+# MERIDIAN_MARKET=<market_account> npm run phoenix:create
+# To mint YES inventory and place a tiny ask on a linked Phoenix book:
+# MERIDIAN_MARKET=<market_account> npm run phoenix:smoke
+# To link an already-created Phoenix market:
+# MERIDIAN_MARKET=<market_account> PHOENIX_MARKET=<phoenix_market> npm run phoenix:link
+# To exercise permissionless Pyth settlement on a market created with a real feed:
+# DEMO_MARKET_TICKER=META DEMO_MARKET_EXPIRY_SECS=20 npm run demo:market
+# MERIDIAN_MARKET=<market_account> npm run pyth:settle
+
+# Automation one-shot runs:
+npm run create:markets
+# After 9:30am ET this command skips by default. For an intentional
+# after-open rerun, use MORNING_ALLOW_AFTER_OPEN=true npm run create:markets.
+SETTLEMENT_MAX_RETRIES=1 npm run settle:markets
 
 # 5. Frontend
 npm run dev --workspace=app
@@ -147,18 +179,18 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full design. In short:
 - **Contract:** a pair of complementary SPL tokens (Yes, No) tied to one stock/strike/day
 - **Invariant:** Yes payout + No payout = $1.00 USDC, always, enforced on-chain
 - **One book, two perspectives:** each strike has a single Phoenix market (Yes vs USDC). Buying No = mint pair + sell Yes. Selling No = buy Yes. The frontend abstracts this.
-- **Settlement:** at 4:05 PM ET, automation reads Pyth's close price, calls `settle_market` per contract. Outcomes are immutable.
+- **Settlement:** at 4:05 PM ET, automation posts a Pyth price update and calls `settle_market` per contract. The on-chain program verifies the Pyth Receiver account owner, feed id, full verification, freshness, and confidence ratio. Devnet smoke demos may still use delayed `admin_settle` for deterministic testing.
 - **Admin override:** if oracle is unreliable, admin can settle manually after a 1-hour delay.
 
 ## Status
 
 - [x] Phase 1 — Repo scaffolding
 - [x] Phase 2 — Anchor program: config, create_strike_market, mint_pair, redeem, pause
-- [x] Phase 3 — Pyth integration + settle_market + admin_settle + redeem_yes/no
+- [x] Phase 3 - Pyth integration + settle_market + admin_settle + redeem_yes/no
 - [x] Phase 4 — Phoenix CLOB linkage + TS trade-router for all 4 paths
-- [x] Phase 5 — Automation service (morning + settlement cron jobs)
-- [x] Phase 6 — Next.js frontend skeleton (Landing, Markets, Trade, Portfolio, History)
-- [ ] Phase 7 — Devnet deployment + lifecycle demo
+- [x] Phase 5 — Automation service (morning + settlement cron jobs, Pyth price-update posting wired)
+- [x] Phase 6 — Next.js frontend (fallback mock data plus live Meridian market reads when IDL/env are present)
+- [ ] Phase 7 - Devnet deployment + lifecycle demo (local fast demo works; devnet Phoenix create/link/order smoke works)
 - [ ] Phase 8 — Polish: docs, CI, property-based tests
 
 ## License

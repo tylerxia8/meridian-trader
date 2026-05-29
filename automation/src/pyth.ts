@@ -3,7 +3,12 @@
 // PriceUpdateV2 account).
 //
 // Hermes API reference: https://docs.pyth.network/price-feeds/api-reference
-import { Connection, PublicKey, TransactionInstruction } from "@solana/web3.js";
+import { Connection, PublicKey } from "@solana/web3.js";
+import { PriceServiceConnection } from "@pythnetwork/price-service-client";
+import {
+  InstructionWithEphemeralSigners,
+  PythSolanaReceiver,
+} from "@pythnetwork/pyth-solana-receiver";
 import { Ticker } from "./config.js";
 
 export interface PythPrice {
@@ -77,18 +82,44 @@ export function hexToFeedIdBytes(hex: string): number[] {
 /// VAA bytes to the Pyth receiver program. Returns the PriceUpdateV2 pubkey
 /// the settlement instruction should read.
 ///
-/// Implementation note: this is a stub. The full flow uses
-/// `@pythnetwork/pyth-solana-receiver` (PythSolanaReceiver class), which
-/// fetches the VAA from Hermes, builds a verification ix, and a "post" ix.
-/// We defer wiring this end-to-end to Phase 7's lifecycle script where the
-/// pieces can be exercised against real devnet/local infra.
+/// Uses `@pythnetwork/price-service-client` to fetch the latest signed VAA
+/// from Hermes, then `@pythnetwork/pyth-solana-receiver` to build the Solana
+/// instructions that post the update account consumed by settle_market.
 export async function postPriceUpdate(
-  _connection: Connection,
-  _feedId: string
-): Promise<{ priceUpdateAccount: PublicKey; ixs: TransactionInstruction[] }> {
-  throw new Error(
-    "postPriceUpdate is not yet wired. Use @pythnetwork/pyth-solana-receiver " +
-      "PythSolanaReceiver.buildPostPriceUpdateInstructions(vaa). Lifecycle " +
-      "demo in Phase 7 will fill this in."
-  );
+  connection: Connection,
+  wallet: any,
+  hermesUrl: string,
+  feedId: string
+): Promise<{
+  priceUpdateAccount: PublicKey;
+  postIxs: InstructionWithEphemeralSigners[];
+  closeIxs: InstructionWithEphemeralSigners[];
+}> {
+  const normalizedFeedId = feedId.replace(/^0x/, "").toLowerCase();
+  const priceService = new PriceServiceConnection(hermesUrl, {
+    priceFeedRequestConfig: { binary: true },
+  });
+  const vaas = await priceService.getLatestVaas([normalizedFeedId]);
+  if (vaas.length === 0) {
+    throw new Error(`Hermes returned no VAA for feed ${feedId}`);
+  }
+
+  const receiver = new PythSolanaReceiver({ connection, wallet });
+  const { postInstructions, priceFeedIdToPriceUpdateAccount, closeInstructions } =
+    await receiver.buildPostPriceUpdateInstructions(vaas);
+  const priceUpdateAccount =
+    priceFeedIdToPriceUpdateAccount[normalizedFeedId] ??
+    priceFeedIdToPriceUpdateAccount[`0x${normalizedFeedId}`];
+  if (!priceUpdateAccount) {
+    const keys = Object.keys(priceFeedIdToPriceUpdateAccount);
+    throw new Error(
+      `Pyth receiver did not return a price update account for feed ${feedId}; returned keys: ${keys.join(", ")}`
+    );
+  }
+
+  return {
+    priceUpdateAccount,
+    postIxs: postInstructions,
+    closeIxs: closeInstructions,
+  };
 }

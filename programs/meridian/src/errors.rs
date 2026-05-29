@@ -22,6 +22,10 @@ pub enum MeridianError {
     OracleConfTooWide,
     #[msg("Oracle price update is for a different feed than this market")]
     OracleFeedMismatch,
+    #[msg("Oracle price update account is invalid or unverified")]
+    InvalidOracleAccount,
+    #[msg("Settlement price must be greater than zero")]
+    InvalidSettlementPrice,
     #[msg("Math overflow")]
     MathOverflow,
     #[msg("Ticker must be non-empty and start with an ASCII uppercase letter")]

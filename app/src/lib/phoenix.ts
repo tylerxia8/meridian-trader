@@ -25,15 +25,15 @@ export class PhoenixWrapper {
     this.client = client;
   }
 
-  static async connect(connection: Connection): Promise<PhoenixWrapper> {
-    const client = await Phoenix.Client.create(connection);
+  static async connect(connection: Connection, endpoint = "devnet"): Promise<PhoenixWrapper> {
+    const client = await Phoenix.Client.create(connection, endpoint);
     return new PhoenixWrapper(client);
   }
 
   /// Load a specific Phoenix market into the client cache. Required before
   /// any place-order or read-orderbook call.
   async ensureMarket(marketAddress: PublicKey): Promise<void> {
-    if (!this.client.marketStates.has(marketAddress.toBase58())) {
+    if (!this.client.markets.has(marketAddress.toBase58())) {
       await this.client.addMarket(marketAddress.toBase58());
     }
   }
@@ -42,15 +42,12 @@ export class PhoenixWrapper {
   /// empty (common for fresh markets before any liquidity is posted).
   async getTopOfBook(marketAddress: PublicKey): Promise<BestBidAsk> {
     await this.ensureMarket(marketAddress);
-    const state = this.client.marketStates.get(marketAddress.toBase58());
-    if (!state) {
-      return { bestBidPriceInUsdc: null, bestAskPriceInUsdc: null };
-    }
-    const bidLadder = state.getUiLadder(1).bids;
-    const askLadder = state.getUiLadder(1).asks;
+    const ladder = this.client.getUiLadder(marketAddress.toBase58(), 1);
+    const bidLadder = ladder.bids;
+    const askLadder = ladder.asks;
     return {
-      bestBidPriceInUsdc: bidLadder[0]?.priceInTicks ?? null,
-      bestAskPriceInUsdc: askLadder[0]?.priceInTicks ?? null,
+      bestBidPriceInUsdc: bidLadder[0]?.price ?? null,
+      bestAskPriceInUsdc: askLadder[0]?.price ?? null,
     };
   }
 
@@ -63,27 +60,20 @@ export class PhoenixWrapper {
     trader: PublicKey;
   }): Promise<TransactionInstruction> {
     await this.ensureMarket(args.marketAddress);
-    const market = this.client.marketStates.get(args.marketAddress.toBase58());
+    const marketAddress = args.marketAddress.toBase58();
+    const market = this.client.markets.get(marketAddress);
     if (!market) throw new Error(`Phoenix market not loaded: ${args.marketAddress.toBase58()}`);
 
-    // SDK API shape may evolve; verify before mainnet. For devnet/local, the
-    // canonical method is `createPlaceLimitOrderInstruction` with IOC + an
-    // extreme price (best-effort taker). Use SDK's market-order helper if
-    // available.
-    return market.createPlaceLimitOrderInstruction(
-      {
-        side: args.side === "Buy" ? Phoenix.Side.Bid : Phoenix.Side.Ask,
-        priceInTicks: args.side === "Buy" ? market.maxPriceInTicks() : market.minPriceInTicks(),
-        numBaseLots: market.baseAtomsToBaseLots(Number(args.sizeInBaseAtoms)),
-        selfTradeBehavior: Phoenix.SelfTradeBehavior.CancelProvide,
-        orderType: Phoenix.OrderType.ImmediateOrCancel,
-        clientOrderId: 0,
-        useOnlyDepositedFunds: false,
-        lastValidSlot: null,
-        lastValidUnixTimestampInSeconds: null,
-      },
-      args.trader
-    );
+    const orderPacket = Phoenix.getImmediateOrCancelOrderPacket({
+      side: args.side === "Buy" ? Phoenix.Side.Bid : Phoenix.Side.Ask,
+      priceInTicks: args.side === "Buy" ? Number.MAX_SAFE_INTEGER : 1,
+      numBaseLots: market.baseAtomsToBaseLots(Number(args.sizeInBaseAtoms)),
+      numQuoteLots: Number.MAX_SAFE_INTEGER,
+      selfTradeBehavior: Phoenix.SelfTradeBehavior.CancelProvide,
+      clientOrderId: 0,
+      useOnlyDepositedFunds: false,
+    });
+    return this.client.createPlaceLimitOrderInstruction(orderPacket, marketAddress, args.trader);
   }
 
   /// Place a limit order at a specific price.
@@ -96,24 +86,24 @@ export class PhoenixWrapper {
     immediateOrCancel?: boolean;
   }): Promise<TransactionInstruction> {
     await this.ensureMarket(args.marketAddress);
-    const market = this.client.marketStates.get(args.marketAddress.toBase58());
+    const marketAddress = args.marketAddress.toBase58();
+    const market = this.client.markets.get(marketAddress);
     if (!market) throw new Error(`Phoenix market not loaded: ${args.marketAddress.toBase58()}`);
 
-    return market.createPlaceLimitOrderInstruction(
-      {
-        side: args.side === "Buy" ? Phoenix.Side.Bid : Phoenix.Side.Ask,
-        priceInTicks: market.uiPriceToTicks(args.priceInUsdc),
-        numBaseLots: market.baseAtomsToBaseLots(Number(args.sizeInBaseAtoms)),
-        selfTradeBehavior: Phoenix.SelfTradeBehavior.CancelProvide,
-        orderType: args.immediateOrCancel
-          ? Phoenix.OrderType.ImmediateOrCancel
-          : Phoenix.OrderType.Limit,
-        clientOrderId: 0,
-        useOnlyDepositedFunds: false,
-        lastValidSlot: null,
-        lastValidUnixTimestampInSeconds: null,
-      },
-      args.trader
-    );
+    const packetArgs = {
+      side: args.side === "Buy" ? Phoenix.Side.Bid : Phoenix.Side.Ask,
+      priceInTicks: market.floatPriceToTicks(args.priceInUsdc),
+      numBaseLots: market.baseAtomsToBaseLots(Number(args.sizeInBaseAtoms)),
+      selfTradeBehavior: Phoenix.SelfTradeBehavior.CancelProvide,
+      clientOrderId: 0,
+      useOnlyDepositedFunds: false,
+    };
+    const orderPacket = args.immediateOrCancel
+      ? Phoenix.getImmediateOrCancelOrderPacket({
+          ...packetArgs,
+          numQuoteLots: Number.MAX_SAFE_INTEGER,
+        })
+      : Phoenix.getLimitOrderPacket(packetArgs);
+    return this.client.createPlaceLimitOrderInstruction(orderPacket, marketAddress, args.trader);
   }
 }

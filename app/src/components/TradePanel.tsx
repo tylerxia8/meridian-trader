@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useWallet } from "@solana/wallet-adapter-react";
 import { AllowedAction } from "@/lib/positions-client";
 
 interface Props {
@@ -18,6 +19,8 @@ export function TradePanel({
   guidance,
 }: Props) {
   const [size, setSize] = useState("1");
+  const [status, setStatus] = useState<string | null>(null);
+  const { connected } = useWallet();
   const noPriceCents = 100 - yesPriceCents;
 
   if (guidance) {
@@ -28,10 +31,19 @@ export function TradePanel({
     );
   }
 
-  // Phase 6 stops at "build the tx and log it". Phase 7 wires the wallet
-  // adapter's sendTransaction to actually broadcast.
   function handleClick(action: AllowedAction) {
-    console.log(`[trade] ${action} ${size} of ${ticker} > $${strikeCents / 100}`);
+    if (!connected) {
+      setStatus("Connect a wallet before trading.");
+      return;
+    }
+    const contracts = Number(size);
+    if (!Number.isFinite(contracts) || contracts <= 0) {
+      setStatus("Enter a positive contract size.");
+      return;
+    }
+    setStatus(
+      `${labelFor(action)} is ready for transaction wiring once this strike is linked to a live Phoenix market.`
+    );
   }
 
   return (
@@ -54,30 +66,32 @@ export function TradePanel({
         <ActionButton
           label="Buy Yes"
           color="yes"
-          enabled={allowed.includes("buyYes")}
+          enabled={connected && allowed.includes("buyYes")}
           onClick={() => handleClick("buyYes")}
         />
         <ActionButton
           label="Sell Yes"
           color="yes"
           variant="outline"
-          enabled={allowed.includes("sellYes")}
+          enabled={connected && allowed.includes("sellYes")}
           onClick={() => handleClick("sellYes")}
         />
         <ActionButton
           label="Buy No"
           color="no"
-          enabled={allowed.includes("buyNo")}
+          enabled={connected && allowed.includes("buyNo")}
           onClick={() => handleClick("buyNo")}
         />
         <ActionButton
           label="Sell No"
           color="no"
           variant="outline"
-          enabled={allowed.includes("sellNo")}
+          enabled={connected && allowed.includes("sellNo")}
           onClick={() => handleClick("sellNo")}
         />
       </div>
+
+      {status ? <p className="text-xs text-amber-300">{status}</p> : null}
 
       <p className="border-t border-slate-800 pt-3 text-xs text-slate-500">
         You pay ${(yesPriceCents / 100).toFixed(2)} per contract. You win $1.00 if {ticker} closes
@@ -85,6 +99,19 @@ export function TradePanel({
       </p>
     </div>
   );
+}
+
+function labelFor(action: AllowedAction): string {
+  switch (action) {
+    case "buyYes":
+      return "Buy Yes";
+    case "sellYes":
+      return "Sell Yes";
+    case "buyNo":
+      return "Buy No";
+    case "sellNo":
+      return "Sell No";
+  }
 }
 
 function PayoffRow({

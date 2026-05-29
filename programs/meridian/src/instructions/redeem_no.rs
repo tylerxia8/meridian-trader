@@ -70,13 +70,7 @@ pub fn redeem_no_handler(ctx: Context<RedeemNo>, amount: u64) -> Result<()> {
     let strike_le = market.strike_price_usd_cents.to_le_bytes();
     let expiry_le = market.expiry_ts.to_le_bytes();
     let bump = [market.bump];
-    let signer_seeds: [&[u8]; 5] = [
-        Market::SEED,
-        ticker.as_ref(),
-        &strike_le,
-        &expiry_le,
-        &bump,
-    ];
+    let signer_seeds: [&[u8]; 5] = [Market::SEED, ticker.as_ref(), &strike_le, &expiry_le, &bump];
     let signer = &[&signer_seeds[..]];
 
     token::transfer(
