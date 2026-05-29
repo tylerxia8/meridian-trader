@@ -182,6 +182,9 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full design. In short:
 - **Settlement:** at 4:05 PM ET, automation posts a Pyth price update and calls `settle_market` per contract. The on-chain program verifies the Pyth Receiver account owner, feed id, full verification, freshness, and confidence ratio. Devnet smoke demos may still use delayed `admin_settle` for deterministic testing.
 - **Admin override:** if oracle is unreliable, admin can settle manually after a 1-hour delay.
 
+For current devnet program IDs, example markets, and known-good smoke commands,
+see [docs/DEVNET_DEMO.md](docs/DEVNET_DEMO.md).
+
 ## Status
 
 - [x] Phase 1 — Repo scaffolding
