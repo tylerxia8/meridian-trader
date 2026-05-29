@@ -84,6 +84,8 @@ export function TradePanel({
         </div>
       ) : null}
 
+      <RoutePreview hasPhoenix={Boolean(phoenixMarket)} />
+
       <div className="grid grid-cols-2 gap-2 pt-2">
         <ActionButton
           label="Buy Yes"
@@ -119,6 +121,34 @@ export function TradePanel({
         You pay ${(yesPriceCents / 100).toFixed(2)} per contract. You win $1.00 if {ticker} closes
         at or above ${(strikeCents / 100).toFixed(0)} at 4:00 PM ET.
       </p>
+    </div>
+  );
+}
+
+function RoutePreview({ hasPhoenix }: { hasPhoenix: boolean }) {
+  const rows: Array<{ action: string; route: string }> = [
+    { action: "Buy Yes", route: "Phoenix buy YES from asks" },
+    { action: "Sell Yes", route: "Phoenix sell YES into bids" },
+    { action: "Buy No", route: "Mint YES/NO pair, then sell YES on Phoenix" },
+    { action: "Sell No", route: "Buy YES on Phoenix, then redeem matched YES/NO" },
+  ];
+
+  return (
+    <div className="rounded border border-slate-800 bg-slate-950/40 px-3 py-2">
+      <div className="mb-2 flex items-center justify-between text-xs">
+        <span className="uppercase tracking-wider text-slate-500">Transaction route</span>
+        <span className={hasPhoenix ? "text-yes" : "text-slate-500"}>
+          {hasPhoenix ? "Phoenix linked" : "Waiting for Phoenix link"}
+        </span>
+      </div>
+      <div className="space-y-1 text-xs">
+        {rows.map((row) => (
+          <div key={row.action} className="grid grid-cols-[4.5rem_1fr] gap-2">
+            <span className="text-slate-400">{row.action}</span>
+            <span className="text-slate-500">{row.route}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
