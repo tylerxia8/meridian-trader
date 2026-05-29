@@ -29,6 +29,7 @@ Run these from WSL in the project root:
 ```bash
 npm run lifecycle:demo
 npm run create:markets
+SETTLEMENT_DRY_RUN=true SETTLEMENT_MAX_RETRIES=1 npm run settle:markets
 SETTLEMENT_MAX_RETRIES=1 npm run settle:markets
 npm run dev --workspace=app
 ```
@@ -38,9 +39,13 @@ Notes:
 - `npm run create:markets` skips after 9:30am ET unless
   `MORNING_ALLOW_AFTER_OPEN=true` is set.
 - The settlement job skips old fake-feed demo markets by design.
+- Use `SETTLEMENT_DRY_RUN=true` for a no-transaction settlement inventory. It
+  reports expired markets, configured feeds, and admin override timing without
+  spending SOL or posting Pyth update accounts.
 - If settlement is run well after the close-price freshness window, real-feed
-  markets can report `OracleStale`. In that case the job logs that delayed
-  `admin_settle` may be needed after the configured override delay.
+  markets can report `OracleStale`. In that case the job summarizes those
+  markets as deferred and logs whether delayed `admin_settle` fallback is
+  enabled.
 - `lifecycle:demo` uses the one-hour admin override delay unless you
   temporarily update deployed config with `ADMIN_OVERRIDE_DELAY_SECS=1 npm run config:update`.
 
@@ -82,6 +87,7 @@ http://localhost:3000/markets
 http://localhost:3000/trade/META
 ```
 
-The trade screen currently shows live markets, linked Phoenix status, and the
-connected wallet's YES/NO token balances. Final Phoenix order submission from
-the browser is the remaining major UX implementation step.
+The trade screen currently shows live markets, linked Phoenix status, the
+connected wallet's YES/NO token balances, Explorer links, and a read-only
+transaction route preview. Final browser wallet submission is intentionally
+separate from the script-based demo path.

@@ -165,6 +165,7 @@ npm run phoenix:probe
 npm run create:markets
 # After 9:30am ET this command skips by default. For an intentional
 # after-open rerun, use MORNING_ALLOW_AFTER_OPEN=true npm run create:markets.
+SETTLEMENT_DRY_RUN=true SETTLEMENT_MAX_RETRIES=1 npm run settle:markets
 SETTLEMENT_MAX_RETRIES=1 npm run settle:markets
 
 # 5. Frontend

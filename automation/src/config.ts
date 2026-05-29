@@ -68,6 +68,8 @@ export interface Config {
   /// Settlement retry policy.
   settlementMaxRetries: number;
   settlementRetryDelayMs: number;
+  /// Inspect eligible markets without sending Pyth or settlement transactions.
+  settlementDryRun: boolean;
   /// Opt-in devnet/demo fallback while on-chain Pyth settlement is unavailable.
   settlementAdminFallback: boolean;
 }
@@ -103,6 +105,7 @@ export function loadConfig(): Config {
     settlementCron: optional("SETTLEMENT_JOB_CRON", "5 16 * * 1-5"),
     settlementMaxRetries: Number(optional("SETTLEMENT_MAX_RETRIES", "30")),
     settlementRetryDelayMs: Number(optional("SETTLEMENT_RETRY_DELAY_MS", "30000")),
+    settlementDryRun: optionalBool("SETTLEMENT_DRY_RUN", false),
     settlementAdminFallback: optionalBool("SETTLEMENT_ADMIN_FALLBACK", false),
   };
 }

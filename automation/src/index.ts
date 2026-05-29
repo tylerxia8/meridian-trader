@@ -16,6 +16,7 @@ async function main(): Promise<void> {
       automationKey: ctx.wallet.publicKey.toBase58(),
       morningCron: cfg.morningCron,
       settlementCron: cfg.settlementCron,
+      settlementDryRun: cfg.settlementDryRun,
     },
     "automation service starting"
   );

@@ -9,6 +9,23 @@ import { logger } from "../logger.js";
 import { isNyseTradingDay } from "../calendar.js";
 import { fetchLatestPrices, postPriceUpdate, pythPriceToUsdCents } from "../pyth.js";
 import { TransactionBuilder } from "@pythnetwork/solana-utils";
+import { classifySettlementError, SettlementFailureKind } from "../settlement-error.js";
+
+type AdminFallbackResult = "settled" | "pending" | "failed";
+
+interface SettlementStats {
+  expired: number;
+  dryRun: number;
+  settled: number;
+  skippedUnconfiguredFeed: number;
+  oracleStale: number;
+  oracleConfTooWide: number;
+  transport: number;
+  hardFailed: number;
+  adminSettled: number;
+  adminPending: number;
+  adminFailed: number;
+}
 
 export async function runSettlementJob(cfg: Config, ctx: ProgramContext): Promise<void> {
   const now = new Date();
@@ -39,7 +56,21 @@ export async function runSettlementJob(cfg: Config, ctx: ProgramContext): Promis
     return;
   }
 
-  logger.info({ count: expired.length }, "settling expired markets");
+  const stats: SettlementStats = {
+    expired: expired.length,
+    dryRun: 0,
+    settled: 0,
+    skippedUnconfiguredFeed: 0,
+    oracleStale: 0,
+    oracleConfTooWide: 0,
+    transport: 0,
+    hardFailed: 0,
+    adminSettled: 0,
+    adminPending: 0,
+    adminFailed: 0,
+  };
+
+  logger.info({ count: expired.length, dryRun: cfg.settlementDryRun }, "settling expired markets");
 
   for (const entry of expired) {
     const market = entry.publicKey;
@@ -53,6 +84,18 @@ export async function runSettlementJob(cfg: Config, ctx: ProgramContext): Promis
         { market: market.toBase58(), ticker: tickerStr, feedId },
         "skipping market with unconfigured Pyth feed id"
       );
+      stats.skippedUnconfiguredFeed += 1;
+      continue;
+    }
+
+    if (cfg.settlementDryRun) {
+      const expiry = entry.account.expiryTs.toNumber();
+      const adminOverrideAt = new Date((expiry + adminOverrideDelaySecs) * 1000).toISOString();
+      logger.info(
+        { market: market.toBase58(), ticker: tickerStr, feedId, expiry, adminOverrideAt },
+        "dry run: market is eligible for settlement"
+      );
+      stats.dryRun += 1;
       continue;
     }
 
@@ -95,17 +138,26 @@ export async function runSettlementJob(cfg: Config, ctx: ProgramContext): Promis
 
         logger.info({ market: market.toBase58(), ticker: tickerStr, attempt }, "settled");
         settled = true;
+        stats.settled += 1;
       } catch (err: any) {
         const msg = err?.message ?? String(err);
         // Transient oracle issues we retry on. Anything else is a hard error.
-        const retryable = /OracleStale|OracleConfTooWide|connection|timeout/i.test(msg);
+        const failureKind = classifySettlementError(msg);
+        const retryable = failureKind !== "hard";
         if (!retryable || attempt === cfg.settlementMaxRetries) {
-          logger.error(
-            { market: market.toBase58(), ticker: tickerStr, attempt, err: msg },
-            "settlement failed; admin_settle override may be needed after the delay window"
-          );
+          recordSettlementFailure(stats, failureKind);
+          logFinalSettlementFailure({
+            market,
+            tickerStr,
+            attempt,
+            err: msg,
+            failureKind,
+            expiry: entry.account.expiryTs.toNumber(),
+            adminOverrideDelaySecs,
+            adminFallback: cfg.settlementAdminFallback,
+          });
           if (cfg.settlementAdminFallback) {
-            settled = await tryAdminSettleFallback({
+            const fallbackResult = await tryAdminSettleFallback({
               cfg,
               ctx,
               configKey,
@@ -115,6 +167,14 @@ export async function runSettlementJob(cfg: Config, ctx: ProgramContext): Promis
               feedId,
               adminOverrideDelaySecs,
             });
+            if (fallbackResult === "settled") {
+              stats.adminSettled += 1;
+              settled = true;
+            } else if (fallbackResult === "pending") {
+              stats.adminPending += 1;
+            } else {
+              stats.adminFailed += 1;
+            }
           }
           break;
         }
@@ -126,7 +186,7 @@ export async function runSettlementJob(cfg: Config, ctx: ProgramContext): Promis
       }
     }
   }
-  logger.info("settlement job complete");
+  logger.info(stats, "settlement job complete");
 }
 
 function feedIdBytesToHex(bytes: number[]): string {
@@ -137,6 +197,44 @@ function feedIdBytesToHex(bytes: number[]): string {
 function isConfiguredFeedId(cfg: Config, feedId: string): boolean {
   const normalized = feedId.toLowerCase();
   return Object.values(cfg.feedIds).some((configured) => configured?.toLowerCase() === normalized);
+}
+
+function recordSettlementFailure(stats: SettlementStats, failureKind: SettlementFailureKind): void {
+  if (failureKind === "oracleStale") stats.oracleStale += 1;
+  else if (failureKind === "oracleConfTooWide") stats.oracleConfTooWide += 1;
+  else if (failureKind === "transport") stats.transport += 1;
+  else stats.hardFailed += 1;
+}
+
+function logFinalSettlementFailure(args: {
+  market: anchor.web3.PublicKey;
+  tickerStr: string;
+  attempt: number;
+  err: string;
+  failureKind: SettlementFailureKind;
+  expiry: number;
+  adminOverrideDelaySecs: number;
+  adminFallback: boolean;
+}): void {
+  const { market, tickerStr, attempt, err, failureKind, expiry, adminOverrideDelaySecs, adminFallback } = args;
+  const payload = {
+    market: market.toBase58(),
+    ticker: tickerStr,
+    attempt,
+    err,
+    adminFallback,
+    adminOverrideAt: new Date((expiry + adminOverrideDelaySecs) * 1000).toISOString(),
+  };
+
+  if (failureKind === "oracleStale") {
+    logger.warn(payload, "settlement deferred: oracle update is outside the freshness window");
+    return;
+  }
+  if (failureKind === "oracleConfTooWide") {
+    logger.warn(payload, "settlement deferred: oracle confidence band is too wide");
+    return;
+  }
+  logger.error(payload, "settlement failed; admin_settle override may be needed after the delay window");
 }
 
 function sleep(ms: number): Promise<void> {
@@ -165,7 +263,7 @@ async function tryAdminSettleFallback(args: {
   expiry: number;
   feedId: string;
   adminOverrideDelaySecs: number;
-}): Promise<boolean> {
+}): Promise<AdminFallbackResult> {
   const { cfg, ctx, configKey, market, tickerStr, expiry, feedId, adminOverrideDelaySecs } = args;
   const nowSec = Math.floor(Date.now() / 1000);
   const earliest = expiry + adminOverrideDelaySecs;
@@ -174,12 +272,12 @@ async function tryAdminSettleFallback(args: {
       { market: market.toBase58(), ticker: tickerStr, earliest },
       "admin_settle fallback enabled, but override delay has not elapsed"
     );
-    return false;
+    return "pending";
   }
 
   if (!isTicker(tickerStr)) {
     logger.error({ market: market.toBase58(), ticker: tickerStr }, "admin fallback ticker is not configured");
-    return false;
+    return "failed";
   }
   const prices = await fetchLatestPrices(cfg.hermesUrl, {
     [tickerStr]: feedId,
@@ -187,7 +285,7 @@ async function tryAdminSettleFallback(args: {
   const price = prices[tickerStr];
   if (!price) {
     logger.error({ market: market.toBase58(), ticker: tickerStr }, "admin fallback missing Hermes price");
-    return false;
+    return "failed";
   }
 
   const priceUsdCents = pythPriceToUsdCents(price);
@@ -204,5 +302,5 @@ async function tryAdminSettleFallback(args: {
     { market: market.toBase58(), ticker: tickerStr, priceUsdCents },
     "settled with admin_settle fallback"
   );
-  return true;
+  return "settled";
 }
