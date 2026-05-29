@@ -1,5 +1,8 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
+import { PublicKey } from "@solana/web3.js";
 import { SettlementCountdown } from "./SettlementCountdown";
 import { OrderBookView } from "./OrderBookView";
 import { TradePanel } from "./TradePanel";
@@ -12,6 +15,8 @@ type StrikeRow = {
   address?: string;
   expiryTs?: number;
   outcome?: LiveMarket["outcome"];
+  yesMint?: string;
+  noMint?: string;
   phoenixMarket?: string | null;
 };
 
@@ -45,13 +50,63 @@ export function TradeView({
         address: market.address,
         expiryTs: market.expiryTs,
         outcome: market.outcome,
+        yesMint: market.yesMint,
+        noMint: market.noMint,
         phoenixMarket: market.phoenixMarket,
       }));
     return live.length > 0 ? live : mockStrikesFor(ticker);
   }, [liveMarkets, ticker]);
   const [selected, setSelected] = useState(strikes[Math.floor(strikes.length / 2)]);
-  const balances: UserBalances = { yes: 0n, no: 0n };
+  const wallet = useWallet();
+  const { connection } = useConnection();
+  const [balances, setBalances] = useState<UserBalances>({ yes: 0n, no: 0n });
+  const [balanceStatus, setBalanceStatus] = useState<string | null>(null);
   const { allowed, guidance } = allowedActions(balances);
+
+  useEffect(() => {
+    setSelected((current) => {
+      const stillPresent = strikes.find(
+        (strike) => strike.address === current.address && strike.strikeCents === current.strikeCents
+      );
+      return stillPresent ?? strikes[Math.floor(strikes.length / 2)];
+    });
+  }, [strikes]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadBalances() {
+      if (!wallet.publicKey || !selected.yesMint || !selected.noMint) {
+        setBalances({ yes: 0n, no: 0n });
+        setBalanceStatus(null);
+        return;
+      }
+
+      setBalanceStatus("Loading balances");
+      try {
+        const yesAta = getAssociatedTokenAddressSync(new PublicKey(selected.yesMint), wallet.publicKey);
+        const noAta = getAssociatedTokenAddressSync(new PublicKey(selected.noMint), wallet.publicKey);
+        const [yesBalance, noBalance] = await Promise.all([
+          readTokenAmount(connection, yesAta),
+          readTokenAmount(connection, noAta),
+        ]);
+        if (!cancelled) {
+          setBalances({ yes: yesBalance, no: noBalance });
+          setBalanceStatus(null);
+        }
+      } catch (err: any) {
+        if (!cancelled) {
+          setBalances({ yes: 0n, no: 0n });
+          setBalanceStatus(err?.message ?? "Could not load balances");
+        }
+      }
+    }
+
+    loadBalances();
+    return () => {
+      cancelled = true;
+    };
+  }, [connection, selected.noMint, selected.yesMint, wallet.publicKey]);
 
   return (
     <div className="space-y-6">
@@ -111,6 +166,11 @@ export function TradeView({
             ticker={ticker}
             strikeCents={selected.strikeCents}
             yesPriceCents={selected.yesPriceCents}
+            marketAddress={selected.address ?? null}
+            phoenixMarket={selected.phoenixMarket ?? null}
+            outcome={selected.outcome ?? null}
+            balances={balances}
+            balanceStatus={balanceStatus}
             allowed={allowed}
             guidance={guidance}
           />
@@ -118,4 +178,14 @@ export function TradeView({
       </div>
     </div>
   );
+}
+
+async function readTokenAmount(connection: { getTokenAccountBalance: (address: PublicKey) => Promise<{ value: { amount: string } }> }, ata: PublicKey): Promise<bigint> {
+  try {
+    const balance = await connection.getTokenAccountBalance(ata);
+    return BigInt(balance.value.amount);
+  } catch (err: any) {
+    if (err?.message?.includes("could not find account")) return 0n;
+    throw err;
+  }
 }

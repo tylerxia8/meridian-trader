@@ -10,6 +10,8 @@ export type LiveMarket = {
   strikeCents: number;
   expiryTs: number;
   outcome: "unsettled" | "yesWins" | "noWins";
+  yesMint: string;
+  noMint: string;
   phoenixMarket: string | null;
 };
 
@@ -111,6 +113,8 @@ function toLiveMarket(entry: any): LiveMarket {
     strikeCents: Number(account.strikePriceUsdCents),
     expiryTs: Number(account.expiryTs),
     outcome: outcomeName(account.outcome),
+    yesMint: account.yesMint.toBase58(),
+    noMint: account.noMint.toBase58(),
     phoenixMarket: phoenix === DEFAULT_PUBKEY ? null : phoenix,
   };
 }
