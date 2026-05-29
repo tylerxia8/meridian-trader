@@ -3,7 +3,8 @@
 // stale/wide-conf failures. An explicit opt-in env flag can use delayed
 // admin_settle if the oracle path remains unavailable after retries.
 import * as anchor from "@coral-xyz/anchor";
-import { Config, isTicker } from "../config.js";
+import BN from "bn.js";
+import { Config, isTicker, readKeypairBytes } from "../config.js";
 import { ProgramContext } from "../program.js";
 import { logger } from "../logger.js";
 import { isNyseTradingDay } from "../calendar.js";
@@ -289,13 +290,15 @@ async function tryAdminSettleFallback(args: {
   }
 
   const priceUsdCents = pythPriceToUsdCents(price);
+  const admin = anchor.web3.Keypair.fromSecretKey(readKeypairBytes(cfg.adminKeypairPath));
   await ctx.program.methods
-    .adminSettle(new anchor.BN(priceUsdCents))
+    .adminSettle(new BN(priceUsdCents))
     .accounts({
-      admin: ctx.wallet.publicKey,
+      admin: admin.publicKey,
       config: configKey,
       market,
     })
+    .signers([admin])
     .rpc();
 
   logger.warn(
