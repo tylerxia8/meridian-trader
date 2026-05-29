@@ -139,7 +139,7 @@ export function TradeView({
                   </div>
                   {s.outcome ? (
                     <div className="mt-1 flex justify-between text-xs text-slate-500">
-                      <span>{s.outcome}</span>
+                      <span>{outcomeLabel(s.outcome)}</span>
                       <span>{s.phoenixMarket ? "Phoenix linked" : "No Phoenix"}</span>
                     </div>
                   ) : null}
@@ -202,6 +202,12 @@ export function TradeView({
 
 function shortAddress(address: string): string {
   return `${address.slice(0, 4)}...${address.slice(-4)}`;
+}
+
+function outcomeLabel(outcome: LiveMarket["outcome"]): string {
+  if (outcome === "yesWins") return "YES won";
+  if (outcome === "noWins") return "NO won";
+  return "Unsettled";
 }
 
 async function readTokenAmount(connection: { getTokenAccountBalance: (address: PublicKey) => Promise<{ value: { amount: string } }> }, ata: PublicKey): Promise<bigint> {

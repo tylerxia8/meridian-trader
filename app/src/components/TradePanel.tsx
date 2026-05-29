@@ -80,7 +80,7 @@ export function TradePanel({
 
       {unavailableReason ? (
         <div className="rounded border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-300">
-          {unavailableReason}
+          {outcome && outcome !== "unsettled" ? `${outcomeLabel(outcome)}. ${unavailableReason}` : unavailableReason}
         </div>
       ) : null}
 
@@ -193,6 +193,12 @@ function labelFor(action: AllowedAction): string {
     case "sellNo":
       return "Sell No";
   }
+}
+
+function outcomeLabel(outcome: NonNullable<Props["outcome"]>): string {
+  if (outcome === "yesWins") return "YES won";
+  if (outcome === "noWins") return "NO won";
+  return "Unsettled";
 }
 
 function PayoffRow({
