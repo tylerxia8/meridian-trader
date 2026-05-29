@@ -1,7 +1,7 @@
 "use client";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
-import { PublicKey } from "@solana/web3.js";
+import { Connection, PublicKey, Transaction } from "@solana/web3.js";
 import { useEffect, useMemo, useState } from "react";
 import type { LiveMarket } from "@/lib/live-markets";
 import { outcomeLabel } from "@/lib/market-stats";
@@ -13,7 +13,7 @@ type PositionRow = {
 };
 
 export function PortfolioView({ markets }: { markets: LiveMarket[] }) {
-  const { publicKey, connected } = useWallet();
+  const { publicKey, connected, sendTransaction } = useWallet();
   const { connection } = useConnection();
   const [rows, setRows] = useState<PositionRow[]>([]);
   const [status, setStatus] = useState<string | null>(null);
@@ -101,7 +101,14 @@ export function PortfolioView({ markets }: { markets: LiveMarket[] }) {
                   <td>{outcomeLabel(row.market.outcome)}</td>
                   <td>{formatContracts(row.yes)}</td>
                   <td>{formatContracts(row.no)}</td>
-                  <td>{redeemableText(row)}</td>
+                  <td>
+                    <RedeemCell
+                      row={row}
+                      publicKey={publicKey}
+                      sendTransaction={sendTransaction}
+                      connection={connection}
+                    />
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -112,11 +119,59 @@ export function PortfolioView({ markets }: { markets: LiveMarket[] }) {
   );
 }
 
-function redeemableText(row: PositionRow): string {
-  if (row.market.outcome === "yesWins") return `${formatContracts(row.yes)} USDC`;
-  if (row.market.outcome === "noWins") return `${formatContracts(row.no)} USDC`;
+function RedeemCell({
+  row,
+  publicKey,
+  sendTransaction,
+  connection,
+}: {
+  row: PositionRow;
+  publicKey: PublicKey | null;
+  sendTransaction: (tx: Transaction, connection: Connection) => Promise<string>;
+  connection: Connection;
+}) {
+  const [status, setStatus] = useState<string | null>(null);
+  const redeem = redeemable(row);
+  if (!redeem) return <span>-</span>;
+  return (
+    <div className="flex flex-col gap-1">
+      <button
+        className="w-fit rounded border border-yes/60 px-2 py-1 text-xs text-yes hover:bg-yes/10"
+        onClick={async () => {
+          if (!publicKey) return;
+          setStatus("Preparing redeem");
+          try {
+            const response = await fetch("/api/redeem", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({
+                kind: redeem.kind,
+                marketAddress: row.market.address,
+                user: publicKey.toBase58(),
+                amountAtoms: redeem.amount.toString(),
+              }),
+            });
+            const payload = (await response.json()) as { transaction?: string; error?: string };
+            if (!response.ok || !payload.transaction) throw new Error(payload.error ?? "Redeem transaction build failed");
+            const signature = await sendTransaction(Transaction.from(base64ToBytes(payload.transaction)), connection);
+            setStatus(`Submitted ${signature.slice(0, 8)}...${signature.slice(-8)}`);
+          } catch (err: any) {
+            setStatus(err?.message ?? "Redeem failed");
+          }
+        }}
+      >
+        Redeem {formatContracts(redeem.amount)}
+      </button>
+      {status ? <span className="text-xs text-slate-500">{status}</span> : null}
+    </div>
+  );
+}
+
+function redeemable(row: PositionRow): { kind: "pair" | "yes" | "no"; amount: bigint } | null {
+  if (row.market.outcome === "yesWins" && row.yes > 0n) return { kind: "yes", amount: row.yes };
+  if (row.market.outcome === "noWins" && row.no > 0n) return { kind: "no", amount: row.no };
   const matched = row.yes < row.no ? row.yes : row.no;
-  return matched > 0n ? `${formatContracts(matched)} matched pair` : "-";
+  return matched > 0n ? { kind: "pair", amount: matched } : null;
 }
 
 function formatContracts(raw: bigint): string {
@@ -134,4 +189,11 @@ async function readTokenAmount(connection: { getTokenAccountBalance: (address: P
     if (err?.message?.includes("could not find account")) return 0n;
     throw err;
   }
+}
+
+function base64ToBytes(value: string): Uint8Array {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
 }
