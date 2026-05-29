@@ -17,8 +17,10 @@ export default async function MarketsPage() {
   const live = await fetchLiveMarkets();
   const counts =
     live.kind === "live"
-      ? live.markets.reduce<Record<string, number>>((acc, market) => {
-          if (market.outcome === "unsettled") acc[market.ticker] = (acc[market.ticker] ?? 0) + 1;
+      ? live.markets.reduce<Record<string, { active: number; settled: number }>>((acc, market) => {
+          acc[market.ticker] ??= { active: 0, settled: 0 };
+          if (market.outcome === "unsettled") acc[market.ticker].active += 1;
+          else acc[market.ticker].settled += 1;
           return acc;
         }, {})
       : {};
@@ -42,7 +44,15 @@ export default async function MarketsPage() {
               <span className="text-xs text-slate-500">{t.name}</span>
             </div>
             <div className="mt-3 text-sm text-slate-400">
-              {live.kind === "live" ? `${counts[t.symbol] ?? 0} active strikes` : "View active strikes ->"}
+              {live.kind === "live" ? (
+                <span>
+                  {counts[t.symbol]?.active ?? 0} active
+                  <span className="text-slate-600"> / </span>
+                  {counts[t.symbol]?.settled ?? 0} settled
+                </span>
+              ) : (
+                "View active strikes ->"
+              )}
             </div>
           </Link>
         ))}

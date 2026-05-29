@@ -146,6 +146,7 @@ npm run lifecycle:demo
 # Local fast path: starts a temporary local validator, deploys Meridian,
 # creates demo USDC, and runs the lifecycle smoke demo end-to-end.
 npm run fast:demo
+npm run demo:status
 
 # Phoenix integration checks
 npm run phoenix:probe

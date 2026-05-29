@@ -28,6 +28,7 @@ Run these from WSL in the project root:
 
 ```bash
 npm run lifecycle:demo
+npm run demo:status
 npm run create:markets
 SETTLEMENT_DRY_RUN=true SETTLEMENT_MAX_RETRIES=1 npm run settle:markets
 SETTLEMENT_MAX_RETRIES=1 npm run settle:markets
@@ -36,6 +37,8 @@ npm run dev --workspace=app
 
 Notes:
 
+- `npm run demo:status` prints a compact chain summary: active markets,
+  settled markets, skipped fake-feed markets, and Phoenix-linked markets.
 - `npm run create:markets` skips after 9:30am ET unless
   `MORNING_ALLOW_AFTER_OPEN=true` is set.
 - The settlement job skips old fake-feed demo markets by design.
