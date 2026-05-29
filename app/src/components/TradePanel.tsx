@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { Transaction } from "@solana/web3.js";
 import { AllowedAction, UserBalances } from "@/lib/positions-client";
 import { outcomeLabel } from "@/lib/market-stats";
 
@@ -31,7 +32,8 @@ export function TradePanel({
 }: Props) {
   const [size, setSize] = useState("1");
   const [status, setStatus] = useState<string | null>(null);
-  const { connected } = useWallet();
+  const { connected, publicKey, sendTransaction } = useWallet();
+  const { connection } = useConnection();
   const noPriceCents = 100 - yesPriceCents;
   const unavailableReason =
     !marketAddress
@@ -42,8 +44,8 @@ export function TradePanel({
           ? "This strike is not linked to a Phoenix book yet."
           : null;
 
-  function handleClick(action: AllowedAction) {
-    if (!connected) {
+  async function handleClick(action: AllowedAction) {
+    if (!connected || !publicKey) {
       setStatus("Connect a wallet before trading.");
       return;
     }
@@ -56,7 +58,28 @@ export function TradePanel({
       setStatus("Enter a positive contract size.");
       return;
     }
-    setStatus(`${labelFor(action)} is ready for Phoenix transaction submission wiring.`);
+    setStatus(`Preparing ${labelFor(action)} transaction`);
+    try {
+      const response = await fetch("/api/trade", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action,
+          marketAddress,
+          phoenixMarket,
+          user: publicKey.toBase58(),
+          sizeContracts: size,
+          yesPriceCents,
+        }),
+      });
+      const payload = (await response.json()) as { transaction?: string; error?: string };
+      if (!response.ok || !payload.transaction) throw new Error(payload.error ?? "Trade transaction build failed");
+      const tx = Transaction.from(base64ToBytes(payload.transaction));
+      const signature = await sendTransaction(tx, connection);
+      setStatus(`${labelFor(action)} submitted: ${signature.slice(0, 8)}...${signature.slice(-8)}`);
+    } catch (err: any) {
+      setStatus(err?.message ?? "Trade submission failed");
+    }
   }
 
   return (
@@ -194,6 +217,13 @@ function labelFor(action: AllowedAction): string {
     case "sellNo":
       return "Sell No";
   }
+}
+
+function base64ToBytes(value: string): Uint8Array {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
 }
 
 function PayoffRow({

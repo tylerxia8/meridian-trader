@@ -92,5 +92,7 @@ http://localhost:3000/trade/META
 
 The trade screen currently shows live markets, linked Phoenix status, the
 connected wallet's YES/NO token balances, Explorer links, and a read-only
-transaction route preview. Final browser wallet submission is intentionally
-separate from the script-based demo path.
+transaction route preview. For Phoenix-linked active markets, the action
+buttons request an unsigned transaction from `/api/trade`; the connected
+browser wallet signs and submits it. The script-based demo path remains useful
+when a devnet browser wallet is unavailable.

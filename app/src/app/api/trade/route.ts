@@ -1,0 +1,99 @@
+import { AnchorProvider, Program } from "@coral-xyz/anchor";
+import { Connection, Keypair, PublicKey, Transaction } from "@solana/web3.js";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
+import { MeridianClient, MarketKeys } from "@/lib/meridian";
+import { PhoenixWrapper } from "@/lib/phoenix";
+import { buildBuyNoIxs, buildBuyYesIx, buildSellNoIxs, buildSellYesIx } from "@/lib/trade";
+
+type TradeAction = "buyYes" | "sellYes" | "buyNo" | "sellNo";
+
+export async function POST(request: Request) {
+  try {
+    const body = (await request.json()) as {
+      action?: TradeAction;
+      marketAddress?: string;
+      phoenixMarket?: string;
+      user?: string;
+      sizeContracts?: string;
+      yesPriceCents?: number;
+    };
+
+    if (!body.action || !body.marketAddress || !body.phoenixMarket || !body.user || !body.sizeContracts) {
+      return Response.json({ error: "Missing trade request fields" }, { status: 400 });
+    }
+
+    const rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_URL ?? process.env.SOLANA_RPC_URL ?? "https://api.devnet.solana.com";
+    const programId = process.env.NEXT_PUBLIC_MERIDIAN_PROGRAM_ID ?? process.env.MERIDIAN_PROGRAM_ID;
+    if (!programId) return Response.json({ error: "Missing Meridian program id" }, { status: 500 });
+
+    const connection = new Connection(rpcUrl, "confirmed");
+    const dummy = Keypair.generate();
+    const wallet = {
+      publicKey: dummy.publicKey,
+      signTransaction: async <T extends Transaction>(tx: T) => tx,
+      signAllTransactions: async <T extends Transaction>(txs: T[]) => txs,
+    };
+    const provider = new AnchorProvider(connection, wallet as any, { commitment: "confirmed" });
+    const idl = JSON.parse(readFileSync(findIdlPath(), "utf8"));
+    idl.address = programId;
+    const program = new Program(idl, provider);
+    const config = await (program.account as any).config.fetch(PublicKey.findProgramAddressSync([Buffer.from("config")], program.programId)[0]);
+    const marketAddress = new PublicKey(body.marketAddress);
+    const marketAccount = await (program.account as any).market.fetch(marketAddress);
+    const marketKeys: MarketKeys = {
+      market: marketAddress,
+      yesMint: marketAccount.yesMint as PublicKey,
+      noMint: marketAccount.noMint as PublicKey,
+      vault: PublicKey.findProgramAddressSync([Buffer.from("vault"), marketAddress.toBuffer()], program.programId)[0],
+    };
+    const user = new PublicKey(body.user);
+    const phoenixMarket = new PublicKey(body.phoenixMarket);
+    const meridian = new MeridianClient({
+      provider,
+      program,
+      usdcMint: config.usdcMint as PublicKey,
+    });
+    const phoenix = await PhoenixWrapper.connect(connection, process.env.NEXT_PUBLIC_SOLANA_CLUSTER ?? "devnet");
+    const sizeAtoms = parseContractsToAtoms(body.sizeContracts);
+    if (sizeAtoms <= 0n) return Response.json({ error: "Size must be greater than zero" }, { status: 400 });
+
+    const ctx = { meridian, phoenix, user, market: marketKeys, phoenixMarket };
+    const tradeIxs =
+      body.action === "buyYes"
+        ? await buildBuyYesIx(ctx, sizeAtoms)
+        : body.action === "sellYes"
+          ? await buildSellYesIx(ctx, sizeAtoms)
+          : body.action === "buyNo"
+            ? await buildBuyNoIxs(ctx, sizeAtoms, (body.yesPriceCents ?? 50) / 100)
+            : await buildSellNoIxs(ctx, sizeAtoms, { unwindWithRedeemPair: true });
+
+    const tx = new Transaction();
+    tx.add(...meridian.ataIxs(marketKeys, user, user), ...tradeIxs);
+    tx.feePayer = user;
+    tx.recentBlockhash = (await connection.getLatestBlockhash("confirmed")).blockhash;
+
+    return Response.json({
+      transaction: tx.serialize({ requireAllSignatures: false, verifySignatures: false }).toString("base64"),
+    });
+  } catch (err: any) {
+    return Response.json({ error: err?.message ?? String(err) }, { status: 500 });
+  }
+}
+
+function parseContractsToAtoms(value: string): bigint {
+  const trimmed = value.trim();
+  if (!/^\d+(\.\d{0,6})?$/.test(trimmed)) throw new Error("Size must be a positive number with up to 6 decimals");
+  const [whole, frac = ""] = trimmed.split(".");
+  return BigInt(whole) * 1_000_000n + BigInt(frac.padEnd(6, "0"));
+}
+
+function findIdlPath(): string {
+  const candidates = [
+    path.resolve(process.cwd(), "..", "target", "idl", "meridian.json"),
+    path.resolve(process.cwd(), "target", "idl", "meridian.json"),
+  ];
+  const found = candidates.find((candidate) => existsSync(candidate));
+  if (!found) throw new Error("Missing target/idl/meridian.json; run anchor build");
+  return found;
+}
