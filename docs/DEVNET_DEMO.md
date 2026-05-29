@@ -38,6 +38,9 @@ Notes:
 - `npm run create:markets` skips after 9:30am ET unless
   `MORNING_ALLOW_AFTER_OPEN=true` is set.
 - The settlement job skips old fake-feed demo markets by design.
+- If settlement is run well after the close-price freshness window, real-feed
+  markets can report `OracleStale`. In that case the job logs that delayed
+  `admin_settle` may be needed after the configured override delay.
 - `lifecycle:demo` uses the one-hour admin override delay unless you
   temporarily update deployed config with `ADMIN_OVERRIDE_DELAY_SECS=1 npm run config:update`.
 
