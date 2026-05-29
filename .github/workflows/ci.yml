@@ -49,5 +49,5 @@ jobs:
           avm install 1.0.2
           avm use 1.0.2
       - run: npm ci --ignore-scripts
-      - run: anchor build
+      - run: anchor build --ignore-keys
       - run: cargo test --manifest-path programs/meridian/Cargo.toml
