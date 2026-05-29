@@ -20,9 +20,21 @@ function mockLadder(midCents: number, side: "bid" | "ask"): Level[] {
   }));
 }
 
-export function OrderBookView({ yesPriceCents }: { yesPriceCents: number }) {
-  const yesBids = mockLadder(yesPriceCents - 1, "bid");
-  const yesAsks = mockLadder(yesPriceCents, "ask");
+export function OrderBookView({
+  yesPriceCents,
+  bestBidCents,
+  bestAskCents,
+  bestBidSize,
+  bestAskSize,
+}: {
+  yesPriceCents: number;
+  bestBidCents: number | null;
+  bestAskCents: number | null;
+  bestBidSize: number | null;
+  bestAskSize: number | null;
+}) {
+  const yesBids = withLiveTop(mockLadder(yesPriceCents - 1, "bid"), bestBidCents, bestBidSize);
+  const yesAsks = withLiveTop(mockLadder(yesPriceCents, "ask"), bestAskCents, bestAskSize);
 
   return (
     <div className="grid grid-cols-2 gap-4 text-sm">
@@ -30,6 +42,17 @@ export function OrderBookView({ yesPriceCents }: { yesPriceCents: number }) {
       <Side label="No" yesBids={yesBids} yesAsks={yesAsks} flip={true} />
     </div>
   );
+}
+
+function withLiveTop(levels: Level[], priceCents: number | null, size: number | null): Level[] {
+  if (priceCents == null) return levels;
+  return [
+    {
+      priceCents,
+      sizeBaseAtoms: BigInt(Math.max(0, Math.round((size ?? 0) * 1_000_000))),
+    },
+    ...levels.slice(1),
+  ];
 }
 
 function Side({

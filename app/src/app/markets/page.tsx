@@ -2,6 +2,8 @@ import Link from "next/link";
 import { fetchLiveMarkets } from "@/lib/live-markets";
 import { summarizeMarketsByTicker } from "@/lib/market-stats";
 
+export const dynamic = "force-dynamic";
+
 // Phase 6: tickers list is static. Phase 7 lifecycle / Phase 8 polish will
 // wire in live last-close prices + active-contract counts from chain.
 const TICKERS = [

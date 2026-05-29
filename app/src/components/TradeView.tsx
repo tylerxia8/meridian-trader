@@ -20,6 +20,10 @@ type StrikeRow = {
   yesMint?: string;
   noMint?: string;
   phoenixMarket?: string | null;
+  bestBidCents?: number | null;
+  bestAskCents?: number | null;
+  bestBidSize?: number | null;
+  bestAskSize?: number | null;
 };
 
 function mockStrikesFor(ticker: string): StrikeRow[] {
@@ -48,13 +52,22 @@ export function TradeView({
       .sort((a, b) => a.strikeCents - b.strikeCents)
       .map<StrikeRow>((market) => ({
         strikeCents: market.strikeCents,
-        yesPriceCents: market.outcome === "yesWins" ? 100 : market.outcome === "noWins" ? 0 : 50,
+        yesPriceCents:
+          market.outcome === "yesWins"
+            ? 100
+            : market.outcome === "noWins"
+              ? 0
+              : market.bestAskCents ?? market.bestBidCents ?? 50,
         address: market.address,
         expiryTs: market.expiryTs,
         outcome: market.outcome,
         yesMint: market.yesMint,
         noMint: market.noMint,
         phoenixMarket: market.phoenixMarket,
+        bestBidCents: market.bestBidCents,
+        bestAskCents: market.bestAskCents,
+        bestBidSize: market.bestBidSize,
+        bestAskSize: market.bestAskSize,
       }));
     return live.length > 0 ? live : mockStrikesFor(ticker);
   }, [liveMarkets, ticker]);
@@ -179,7 +192,13 @@ export function TradeView({
               ) : null}
             </div>
           ) : null}
-          <OrderBookView yesPriceCents={selected.yesPriceCents} />
+          <OrderBookView
+            yesPriceCents={selected.yesPriceCents}
+            bestBidCents={selected.bestBidCents ?? null}
+            bestAskCents={selected.bestAskCents ?? null}
+            bestBidSize={selected.bestBidSize ?? null}
+            bestAskSize={selected.bestAskSize ?? null}
+          />
         </section>
 
         <aside className="rounded-lg border border-slate-800 bg-panel p-4">

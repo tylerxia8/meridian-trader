@@ -3,6 +3,7 @@ import type { Idl } from "@coral-xyz/anchor";
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { PhoenixWrapper } from "./phoenix";
 
 export type LiveMarket = {
   address: string;
@@ -15,6 +16,10 @@ export type LiveMarket = {
   yesMint: string;
   noMint: string;
   phoenixMarket: string | null;
+  bestBidCents: number | null;
+  bestAskCents: number | null;
+  bestBidSize: number | null;
+  bestAskSize: number | null;
   priceFeedId: string;
   configuredFeed: boolean;
 };
@@ -69,9 +74,11 @@ export async function fetchLiveMarkets(): Promise<LiveMarketStatus> {
       "timed out reading live markets"
     );
     const configuredFeeds = configuredFeedIds(rootEnv);
+    const markets = accounts.map((entry: any) => toLiveMarket(entry, configuredFeeds));
+    await hydratePhoenixTopOfBook(connection, markets);
     return {
       kind: "live",
-      markets: accounts.map((entry: any) => toLiveMarket(entry, configuredFeeds)),
+      markets,
     };
   } catch (err: any) {
     return { kind: "unavailable", reason: err?.message ?? String(err) };
@@ -124,6 +131,10 @@ function toLiveMarket(entry: any, configuredFeeds: Set<string>): LiveMarket {
     yesMint: account.yesMint.toBase58(),
     noMint: account.noMint.toBase58(),
     phoenixMarket: phoenix === DEFAULT_PUBKEY ? null : phoenix,
+    bestBidCents: null,
+    bestAskCents: null,
+    bestBidSize: null,
+    bestAskSize: null,
     priceFeedId,
     configuredFeed: configuredFeeds.has(priceFeedId.toLowerCase()),
   };
@@ -147,4 +158,31 @@ function configuredFeedIds(rootEnv: Record<string, string>): Set<string> {
 function feedIdBytesToHex(bytes: number[]): string {
   if (!Array.isArray(bytes) || bytes.length !== 32) return "invalid";
   return `0x${bytes.map((b) => b.toString(16).padStart(2, "0")).join("")}`;
+}
+
+async function hydratePhoenixTopOfBook(connection: Connection, markets: LiveMarket[]): Promise<void> {
+  const linked = markets.filter((market) => market.phoenixMarket);
+  if (linked.length === 0) return;
+  try {
+    const phoenix = await withTimeout(PhoenixWrapper.connect(connection, "devnet"), 4_000, "timed out connecting Phoenix");
+    await Promise.all(
+      linked.map(async (market) => {
+        try {
+          const top = await withTimeout(
+            phoenix.getTopOfBook(new PublicKey(market.phoenixMarket!)),
+            4_000,
+            "timed out reading Phoenix book"
+          );
+          market.bestBidCents = top.bestBidPriceInUsdc == null ? null : Math.round(top.bestBidPriceInUsdc * 100);
+          market.bestAskCents = top.bestAskPriceInUsdc == null ? null : Math.round(top.bestAskPriceInUsdc * 100);
+          market.bestBidSize = top.bestBidSizeInBaseUnits;
+          market.bestAskSize = top.bestAskSizeInBaseUnits;
+        } catch {
+          // Leave top-of-book empty if Phoenix is slow or the linked market is no longer readable.
+        }
+      })
+    );
+  } catch {
+    // Live Meridian markets are still useful even if Phoenix book reads are unavailable.
+  }
 }

@@ -4,6 +4,8 @@ import { fetchLiveMarkets, LiveMarket } from "@/lib/live-markets";
 import { outcomeLabel, summarizeMarkets, summarizeMarketsByTicker } from "@/lib/market-stats";
 import { solanaExplorerAccountUrl } from "@/lib/explorer";
 
+export const dynamic = "force-dynamic";
+
 export default async function StatusPage() {
   const live = await fetchLiveMarkets();
 

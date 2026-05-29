@@ -16,6 +16,8 @@ export type Side = "Buy" | "Sell";
 export interface BestBidAsk {
   bestBidPriceInUsdc: number | null;
   bestAskPriceInUsdc: number | null;
+  bestBidSizeInBaseUnits: number | null;
+  bestAskSizeInBaseUnits: number | null;
 }
 
 export class PhoenixWrapper {
@@ -48,6 +50,8 @@ export class PhoenixWrapper {
     return {
       bestBidPriceInUsdc: bidLadder[0]?.price ?? null,
       bestAskPriceInUsdc: askLadder[0]?.price ?? null,
+      bestBidSizeInBaseUnits: bidLadder[0]?.quantity ?? null,
+      bestAskSizeInBaseUnits: askLadder[0]?.quantity ?? null,
     };
   }
 

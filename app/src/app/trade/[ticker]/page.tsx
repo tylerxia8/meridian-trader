@@ -4,6 +4,8 @@ import { fetchLiveMarkets } from "@/lib/live-markets";
 
 const VALID_TICKERS = ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA"] as const;
 
+export const dynamic = "force-dynamic";
+
 export default async function TradePage({ params }: { params: Promise<{ ticker: string }> }) {
   const { ticker: rawTicker } = await params;
   const ticker = rawTicker.toUpperCase();
