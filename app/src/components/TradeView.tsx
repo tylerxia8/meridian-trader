@@ -9,6 +9,7 @@ import { TradePanel } from "./TradePanel";
 import { allowedActions, UserBalances } from "@/lib/positions-client";
 import { solanaExplorerAccountUrl } from "@/lib/explorer";
 import type { LiveMarket } from "@/lib/live-markets";
+import { outcomeLabel } from "@/lib/market-stats";
 
 type StrikeRow = {
   strikeCents: number;
@@ -202,12 +203,6 @@ export function TradeView({
 
 function shortAddress(address: string): string {
   return `${address.slice(0, 4)}...${address.slice(-4)}`;
-}
-
-function outcomeLabel(outcome: LiveMarket["outcome"]): string {
-  if (outcome === "yesWins") return "YES won";
-  if (outcome === "noWins") return "NO won";
-  return "Unsettled";
 }
 
 async function readTokenAmount(connection: { getTokenAccountBalance: (address: PublicKey) => Promise<{ value: { amount: string } }> }, ata: PublicKey): Promise<bigint> {

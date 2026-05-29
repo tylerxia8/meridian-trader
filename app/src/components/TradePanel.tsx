@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { AllowedAction, UserBalances } from "@/lib/positions-client";
+import { outcomeLabel } from "@/lib/market-stats";
 
 interface Props {
   ticker: string;
@@ -193,12 +194,6 @@ function labelFor(action: AllowedAction): string {
     case "sellNo":
       return "Sell No";
   }
-}
-
-function outcomeLabel(outcome: NonNullable<Props["outcome"]>): string {
-  if (outcome === "yesWins") return "YES won";
-  if (outcome === "noWins") return "NO won";
-  return "Unsettled";
 }
 
 function PayoffRow({

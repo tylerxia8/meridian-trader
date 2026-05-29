@@ -10,9 +10,13 @@ export type LiveMarket = {
   strikeCents: number;
   expiryTs: number;
   outcome: "unsettled" | "yesWins" | "noWins";
+  settlementPriceCents: number;
+  settlementTs: number;
   yesMint: string;
   noMint: string;
   phoenixMarket: string | null;
+  priceFeedId: string;
+  configuredFeed: boolean;
 };
 
 export type LiveMarketStatus =
@@ -64,9 +68,10 @@ export async function fetchLiveMarkets(): Promise<LiveMarketStatus> {
       LIVE_MARKETS_TIMEOUT_MS,
       "timed out reading live markets"
     );
+    const configuredFeeds = configuredFeedIds(rootEnv);
     return {
       kind: "live",
-      markets: accounts.map((entry: any) => toLiveMarket(entry)),
+      markets: accounts.map((entry: any) => toLiveMarket(entry, configuredFeeds)),
     };
   } catch (err: any) {
     return { kind: "unavailable", reason: err?.message ?? String(err) };
@@ -104,18 +109,23 @@ function readRootEnv(): Record<string, string> {
   return parsed;
 }
 
-function toLiveMarket(entry: any): LiveMarket {
+function toLiveMarket(entry: any, configuredFeeds: Set<string>): LiveMarket {
   const account = entry.account;
   const phoenix = account.phoenixMarket?.toBase58?.() ?? DEFAULT_PUBKEY;
+  const priceFeedId = feedIdBytesToHex(account.priceFeedId as number[]);
   return {
     address: entry.publicKey.toBase58(),
     ticker: String.fromCharCode(...account.ticker.filter((b: number) => b !== 0)),
     strikeCents: Number(account.strikePriceUsdCents),
     expiryTs: Number(account.expiryTs),
     outcome: outcomeName(account.outcome),
+    settlementPriceCents: Number(account.settlementPriceUsdCents),
+    settlementTs: Number(account.settlementTs),
     yesMint: account.yesMint.toBase58(),
     noMint: account.noMint.toBase58(),
     phoenixMarket: phoenix === DEFAULT_PUBKEY ? null : phoenix,
+    priceFeedId,
+    configuredFeed: configuredFeeds.has(priceFeedId.toLowerCase()),
   };
 }
 
@@ -124,4 +134,17 @@ function outcomeName(outcome: any): LiveMarket["outcome"] {
   if ("yesWins" in outcome) return "yesWins";
   if ("noWins" in outcome) return "noWins";
   return "unsettled";
+}
+
+function configuredFeedIds(rootEnv: Record<string, string>): Set<string> {
+  const feeds = new Set<string>();
+  for (const [key, value] of Object.entries({ ...rootEnv, ...process.env })) {
+    if (key.startsWith("PYTH_FEED_") && value) feeds.add(value.toLowerCase());
+  }
+  return feeds;
+}
+
+function feedIdBytesToHex(bytes: number[]): string {
+  if (!Array.isArray(bytes) || bytes.length !== 32) return "invalid";
+  return `0x${bytes.map((b) => b.toString(16).padStart(2, "0")).join("")}`;
 }

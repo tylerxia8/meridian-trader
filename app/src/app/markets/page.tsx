@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { fetchLiveMarkets } from "@/lib/live-markets";
+import { summarizeMarketsByTicker } from "@/lib/market-stats";
 
 // Phase 6: tickers list is static. Phase 7 lifecycle / Phase 8 polish will
 // wire in live last-close prices + active-contract counts from chain.
@@ -15,15 +16,7 @@ const TICKERS = [
 
 export default async function MarketsPage() {
   const live = await fetchLiveMarkets();
-  const counts =
-    live.kind === "live"
-      ? live.markets.reduce<Record<string, { active: number; settled: number }>>((acc, market) => {
-          acc[market.ticker] ??= { active: 0, settled: 0 };
-          if (market.outcome === "unsettled") acc[market.ticker].active += 1;
-          else acc[market.ticker].settled += 1;
-          return acc;
-        }, {})
-      : {};
+  const counts = live.kind === "live" ? summarizeMarketsByTicker(live.markets) : {};
 
   return (
     <div className="space-y-6">

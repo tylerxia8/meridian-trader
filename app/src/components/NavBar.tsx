@@ -23,6 +23,9 @@ export function NavBar() {
           <Link href="/portfolio" className="hover:text-white">
             Portfolio
           </Link>
+          <Link href="/status" className="hover:text-white">
+            Status
+          </Link>
           <Link href="/history" className="hover:text-white">
             History
           </Link>
