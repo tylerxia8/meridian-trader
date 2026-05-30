@@ -1,59 +1,59 @@
-# Meridian — Binary Stock Outcome Markets on Solana
+# Meridian - Binary Stock Outcome Markets on Solana
 
-A non-custodial Solana dApp for trading binary outcome contracts on the daily closing prices of MAG7 US equities (AAPL, MSFT, GOOGL, AMZN, NVDA, META, TSLA). Each contract asks *"Will [STOCK] close at or above [PRICE] today?"* and pays $1 USDC if yes, $0 if no. Contracts expire same-day (0DTE) and settle at 4:00 PM ET via the Pyth oracle. Yes and No tokens trade on Phoenix CLOB.
+A non-custodial Solana dApp for trading binary outcome contracts on the daily closing prices of MAG7 US equities: AAPL, MSFT, GOOGL, AMZN, NVDA, META, and TSLA. Each contract asks: "Will [STOCK] close at or above [PRICE] today?" YES pays $1 USDC if true; NO pays $1 USDC if false. Contracts expire same-day and settle from Pyth equity feeds. YES tokens trade against USDC on Phoenix CLOB, while the UI maps YES/NO actions onto one book.
 
-**Status:** compile-clean frontend/automation with a working local lifecycle demo, devnet Phoenix market creation/linking, and a live Phoenix order smoke. On-chain Pyth settlement is implemented by manually parsing posted Pyth Receiver `PriceUpdateV2` accounts; `admin_settle` remains the delayed fallback for demos and oracle outages.
+**Status:** compile-clean frontend and automation, deployed devnet Meridian program, working lifecycle demo, Pyth settlement path, delayed admin fallback, Phoenix market creation/linking, two-sided Phoenix liquidity seeding, wallet portfolio/history views, and browser transaction builders for trade/redeem.
 
 ## Architecture
 
-```
-┌──────────────────────┐    ┌─────────────────────┐    ┌───────────────────┐
-│  Frontend (Next.js)  │    │  Automation (Node)  │    │   Phoenix CLOB    │
-│  - Markets / Trade   │◄──►│  - Morning: create  │    │   (Yes vs USDC)   │
-│  - Portfolio         │    │  - 4pm: settle      │    └─────────▲─────────┘
-└──────────▲───────────┘    └──────────▲──────────┘              │
-           │                           │                          │
-           │      ┌────────────────────▼──────────────────────────▼─┐
-           └─────►│   Meridian Anchor Program (Rust, Solana devnet) │
-                  │   mint_pair · settle_market · redeem · admin    │
-                  └────────────────────▲────────────────────────────┘
-                                       │
-                                  ┌────▼────┐
-                                  │  Pyth   │
-                                  └─────────┘
+```text
+Frontend (Next.js)
+  - Markets, trade, portfolio, history, status
+  - Wallet signs trade/redeem transactions
+        |
+        v
+Meridian Anchor Program (Solana)
+  - create_strike_market
+  - mint_pair
+  - settle_market / admin_settle
+  - redeem_pair / redeem_yes / redeem_no
+        ^
+        |
+Automation (Node)
+  - morning market creation
+  - settlement jobs
+  - Pyth price updates
+
+Phoenix CLOB
+  - one YES/USDC book per linked strike
+  - bid/ask liquidity gates browser trading
+
+Pyth
+  - equity price feeds for settlement
 ```
 
-## Repo layout
+## Repo Layout
 
-```
-programs/meridian/      Rust Anchor program (smart contract)
-app/                    Next.js frontend (TypeScript + wallet-adapter)
-automation/             Node.js cron service (market creation + settlement)
-scripts/                Deployment + lifecycle demo scripts
-tests/                  Anchor integration tests (TypeScript)
-docs/                   Architecture decisions, trade-offs, risks
+```text
+programs/meridian/      Rust Anchor program
+app/                    Next.js frontend
+automation/             Node.js market creation and settlement service
+scripts/                Deployment, demo, Phoenix, and lifecycle scripts
+docs/                   Architecture, devnet notes, and risks
 ```
 
 ## Prerequisites
 
-| Tool | Version | Verify |
-|---|---|---|
-| Node.js | ≥ 20 | `node --version` |
-| Rust | ≥ 1.75 | `rustc --version` |
-| Solana CLI | ≥ 1.18 | `solana --version` |
-| Anchor | ≥ 0.30 | `anchor --version` |
+| Tool | Recommended | Verify |
+|---|---:|---|
+| Node.js | 20+ | `node --version` |
+| Rust | 1.75+ | `rustc --version` |
+| Solana CLI | 1.18+ | `solana --version` |
+| Anchor CLI | 1.0.2 currently used | `anchor --version` |
 
-### On Windows (WSL strongly recommended)
+WSL 2 + Ubuntu is strongly recommended on Windows. Avoid mixing a Windows-path checkout with a WSL-path checkout for Anchor/Solana work.
 
-The Solana toolchain has rough edges on native Windows. The most reliable path is WSL 2 + Ubuntu:
-
-```powershell
-# In PowerShell as Administrator (one-time):
-wsl --install -d Ubuntu
-# Restart, open Ubuntu, then continue inside WSL:
-```
-
-Then inside the WSL shell:
+## WSL Setup
 
 ```bash
 # Node.js 20 via nvm
@@ -69,136 +69,148 @@ source ~/.cargo/env
 sh -c "$(curl -sSfL https://release.solana.com/v1.18.17/install)"
 export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
 
-# Anchor (via AVM)
+# Anchor via AVM
 cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
-avm install 0.30.1
-avm use 0.30.1
-
-# Verify everything
-node --version && rustc --version && solana --version && anchor --version
+avm install 1.0.2
+avm use 1.0.2
 ```
 
-Clone this repo inside WSL too (don't mix Windows-path and WSL-path checkouts):
+## First Build
 
 ```bash
-git clone https://github.com/tylerxia8/meridian-trader.git
-cd meridian-trader
+npm install --ignore-scripts
+anchor build
+npm run lint
+npm run typecheck
+npm test --workspace=automation
+npm run build --workspace=app
 ```
 
-### On macOS / Linux
+If `anchor build` reports a program ID mismatch, run `anchor keys sync` or deploy with the program keypair that matches the source.
+
+## Devnet Quick Start
 
 ```bash
-brew install node                              # macOS
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-sh -c "$(curl -sSfL https://release.solana.com/v1.18.17/install)"
-cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
-avm install 0.30.1 && avm use 0.30.1
-```
-
-## First-build sanity check
-
-Before running anything, verify the program compiles and the tests pass:
-
-```bash
-npm install --ignore-scripts         # native Windows avoids transitive postinstall shell issues
-anchor build                         # compiles the Rust program
-anchor keys sync                     # syncs the on-chain program ID into lib.rs + Anchor.toml
-anchor test                          # runs the Anchor TS integration tests
-cd automation && npm test            # runs the pure-TS strike calc tests
-```
-
-If `anchor build` complains about generated IDs, run `anchor keys sync` and rebuild.
-
-## Quick start (devnet)
-
-```bash
-# 1. Generate keypairs (one-time)
+# One-time keypairs
 mkdir -p keypairs
 solana-keygen new -o ./keypairs/admin.json --no-bip39-passphrase
 solana-keygen new -o ./keypairs/automation.json --no-bip39-passphrase
 solana config set --url https://api.devnet.solana.com
-solana airdrop 2 $(solana address -k ./keypairs/admin.json)
-solana airdrop 2 $(solana address -k ./keypairs/automation.json)
 
-# 2. Copy + fill env
+# Copy and fill environment
 cp .env.example .env
-# Fill in PYTH_FEED_<TICKER> values from
-# https://pyth.network/developers/price-feed-ids#solana-stable
-# (Equities Stable section)
+```
 
-# 3. Deploy the program
+Required `.env` values include:
+
+```bash
+SOLANA_CLUSTER=devnet
+SOLANA_RPC_URL=https://api.devnet.solana.com
+NEXT_PUBLIC_SOLANA_CLUSTER=devnet
+NEXT_PUBLIC_SOLANA_RPC_URL=https://api.devnet.solana.com
+MERIDIAN_PROGRAM_ID=<deployed_program_id>
+NEXT_PUBLIC_MERIDIAN_PROGRAM_ID=<deployed_program_id>
+USDC_MINT=<devnet_usdc_mint>
+ANCHOR_WALLET=./keypairs/admin.json
+AUTOMATION_WALLET=./keypairs/automation.json
+PYTH_FEED_META=<0x_feed_id>
+```
+
+Build and deploy:
+
+```bash
 anchor build
-anchor deploy --provider.cluster devnet
-# Copy the printed program id into MERIDIAN_PROGRAM_ID in .env
+anchor program deploy target/deploy/meridian.so \
+  --program-keypair target/deploy/meridian-keypair.json \
+  --provider.cluster devnet
+anchor keys list
+```
 
-# 4. Run the lifecycle smoke demo
-#    preflight -> initialize config if missing -> create demo market
-#    -> mint/redeem if the admin wallet has demo USDC -> delayed admin_settle
-#    -> winning-token redemption from a second wallet
+Copy the `meridian` program ID into both `MERIDIAN_PROGRAM_ID` and `NEXT_PUBLIC_MERIDIAN_PROGRAM_ID`.
+
+## Demo Commands
+
+```bash
+# Readiness and smoke lifecycle
 npm run lifecycle:demo
-
-# Optional: update deployed config parameters without reinitializing the PDA.
-# For a full same-session admin-settle demo:
-# ADMIN_OVERRIDE_DELAY_SECS=1 npm run config:update
-# Restore the PRD default afterward:
-# ADMIN_OVERRIDE_DELAY_SECS=3600 npm run config:update
-
-# Local fast path: starts a temporary local validator, deploys Meridian,
-# creates demo USDC, and runs the lifecycle smoke demo end-to-end.
-npm run fast:demo
 npm run demo:status
 
-# Phoenix integration checks
-npm run phoenix:probe
-# To create a fresh non-expired Meridian demo market:
-# npm run demo:market
-# To create a Phoenix-linked, two-sided-liquidity trading demo:
-# npm run trade:demo
-# To create and link a Phoenix Yes/USDC market for an existing Meridian market:
-# MERIDIAN_MARKET=<market_account> npm run phoenix:create
-# To mint YES inventory and place a tiny ask on a linked Phoenix book:
-# MERIDIAN_MARKET=<market_account> npm run phoenix:smoke
-# To link an already-created Phoenix market:
-# MERIDIAN_MARKET=<market_account> PHOENIX_MARKET=<phoenix_market> npm run phoenix:link
-# To exercise permissionless Pyth settlement on a market created with a real feed:
-# DEMO_MARKET_TICKER=META DEMO_MARKET_EXPIRY_SECS=20 npm run demo:market
-# MERIDIAN_MARKET=<market_account> npm run pyth:settle
-
-# Automation one-shot runs:
+# Create daily configured-feed markets
 npm run create:markets
-# After 9:30am ET this command skips by default. For an intentional
-# after-open rerun, use MORNING_ALLOW_AFTER_OPEN=true npm run create:markets.
+
+# Settlement inventory and settlement
 SETTLEMENT_DRY_RUN=true SETTLEMENT_MAX_RETRIES=1 npm run settle:markets
 SETTLEMENT_MAX_RETRIES=1 npm run settle:markets
 
-# 5. Frontend
-npm run dev --workspace=app
-# → http://localhost:3000
+# Phoenix checks
+npm run phoenix:probe
+npm run demo:market
+MERIDIAN_MARKET=<market_account> npm run phoenix:create
+MERIDIAN_MARKET=<market_account> npm run phoenix:smoke
+MERIDIAN_MARKET=<market_account> PHOENIX_MARKET=<phoenix_market> npm run phoenix:link
+
+# One-command tradable demo:
+# creates a Meridian market, links a Phoenix book, and seeds bid/ask liquidity.
+npm run trade:demo
+
+# Permissionless Pyth settlement smoke for a short-lived real-feed market
+DEMO_MARKET_TICKER=META DEMO_MARKET_EXPIRY_SECS=20 npm run demo:market
+MERIDIAN_MARKET=<market_account> npm run pyth:settle
 ```
 
-## Core concepts
+Notes:
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full design. In short:
+- `create:markets` skips after 9:30am ET unless `MORNING_ALLOW_AFTER_OPEN=true` is set.
+- `trade:demo` spends devnet SOL because it creates a Phoenix market and seeds liquidity.
+- Browser trading requires an active Phoenix-linked market with live bid/ask liquidity. Empty books intentionally disable market-order buttons.
+- The app can prepare a connected wallet's Phoenix seat through `/api/phoenix-seat`, using the configured devnet admin authority.
 
-- **Contract:** a pair of complementary SPL tokens (Yes, No) tied to one stock/strike/day
-- **Invariant:** Yes payout + No payout = $1.00 USDC, always, enforced on-chain
-- **One book, two perspectives:** each strike has a single Phoenix market (Yes vs USDC). Buying No = mint pair + sell Yes. Selling No = buy Yes. The frontend abstracts this.
-- **Settlement:** at 4:05 PM ET, automation posts a Pyth price update and calls `settle_market` per contract. The on-chain program verifies the Pyth Receiver account owner, feed id, full verification, freshness, and confidence ratio. Devnet smoke demos may still use delayed `admin_settle` for deterministic testing.
-- **Admin override:** if oracle is unreliable, admin can settle manually after a 1-hour delay.
+## Frontend
 
-For current devnet program IDs, example markets, and known-good smoke commands,
-see [docs/DEVNET_DEMO.md](docs/DEVNET_DEMO.md).
+```bash
+npm run dev --workspace=app
+```
+
+Open:
+
+```text
+http://localhost:3000/markets
+http://localhost:3000/status
+http://localhost:3000/trade/META
+http://localhost:3000/portfolio
+http://localhost:3000/history
+```
+
+Useful API endpoints:
+
+```text
+GET  /api/status
+POST /api/trade
+POST /api/redeem
+POST /api/phoenix-seat
+```
+
+## Core Concepts
+
+- **Complementary tokens:** each market mints YES and NO SPL tokens.
+- **$1 invariant:** one matched YES/NO pair always redeems for $1 USDC before settlement.
+- **One book, two perspectives:** Phoenix lists YES/USDC. Buying NO is implemented as mint pair plus sell YES; selling NO is buy YES plus redeem matched pair.
+- **Settlement:** automation posts a Pyth price update and calls `settle_market`. The program verifies owner, feed ID, full verification, freshness, and confidence ratio.
+- **Admin fallback:** delayed `admin_settle` remains available for demos and oracle outages.
+- **Liquidity gating:** the UI and API only allow market-order actions when the required Phoenix side has live depth.
+
+For current devnet program IDs, known-good markets, and demo notes, see [docs/DEVNET_DEMO.md](docs/DEVNET_DEMO.md).
 
 ## Status
 
-- [x] Phase 1 — Repo scaffolding
-- [x] Phase 2 — Anchor program: config, create_strike_market, mint_pair, redeem, pause
-- [x] Phase 3 - Pyth integration + settle_market + admin_settle + redeem_yes/no
-- [x] Phase 4 — Phoenix CLOB linkage + TS trade-router for all 4 paths
-- [x] Phase 5 — Automation service (morning + settlement cron jobs, Pyth price-update posting wired)
-- [x] Phase 6 — Next.js frontend (fallback mock data plus live Meridian market reads when IDL/env are present)
-- [ ] Phase 7 - Devnet deployment + lifecycle demo (local fast demo works; devnet Phoenix create/link/order smoke works)
-- [ ] Phase 8 — Polish: docs, CI, property-based tests
+- [x] Phase 1 - Repo scaffolding
+- [x] Phase 2 - Anchor program: config, create market, mint, redeem, pause
+- [x] Phase 3 - Pyth settlement, delayed admin fallback, winning-token redemption
+- [x] Phase 4 - Phoenix CLOB linkage and trade-router paths
+- [x] Phase 5 - Automation service for morning creation and settlement
+- [x] Phase 6 - Next.js frontend with live market, portfolio, history, and status views
+- [x] Phase 7 - Devnet deployment and lifecycle/Phoenix smoke flows
+- [ ] Phase 8 - Product polish, monitoring, richer test coverage, and production hardening
 
 ## License
 
