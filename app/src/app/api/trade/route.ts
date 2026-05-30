@@ -4,6 +4,8 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { MeridianClient, MarketKeys } from "@/lib/meridian";
 import { PhoenixWrapper } from "@/lib/phoenix";
+import { envValue } from "@/lib/server/env";
+import { ensurePhoenixSeat } from "@/lib/server/phoenix-seat";
 import { buildBuyNoIxs, buildBuyYesIx, buildSellNoIxs, buildSellYesIx } from "@/lib/trade";
 
 type TradeAction = "buyYes" | "sellYes" | "buyNo" | "sellNo";
@@ -23,8 +25,8 @@ export async function POST(request: Request) {
       return Response.json({ error: "Missing trade request fields" }, { status: 400 });
     }
 
-    const rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_URL ?? process.env.SOLANA_RPC_URL ?? "https://api.devnet.solana.com";
-    const programId = process.env.NEXT_PUBLIC_MERIDIAN_PROGRAM_ID ?? process.env.MERIDIAN_PROGRAM_ID;
+    const rpcUrl = envValue("NEXT_PUBLIC_SOLANA_RPC_URL", "SOLANA_RPC_URL") ?? "https://api.devnet.solana.com";
+    const programId = envValue("NEXT_PUBLIC_MERIDIAN_PROGRAM_ID", "MERIDIAN_PROGRAM_ID");
     if (!programId) return Response.json({ error: "Missing Meridian program id" }, { status: 500 });
 
     const connection = new Connection(rpcUrl, "confirmed");
@@ -41,6 +43,12 @@ export async function POST(request: Request) {
     const config = await (program.account as any).config.fetch(PublicKey.findProgramAddressSync([Buffer.from("config")], program.programId)[0]);
     const marketAddress = new PublicKey(body.marketAddress);
     const marketAccount = await (program.account as any).market.fetch(marketAddress);
+    if (outcomeName(marketAccount.outcome) !== "unsettled") {
+      return Response.json({ error: "Market is already settled" }, { status: 400 });
+    }
+    if (Number(marketAccount.expiryTs) <= Math.floor(Date.now() / 1000)) {
+      return Response.json({ error: "Market is expired and waiting for settlement" }, { status: 400 });
+    }
     const marketKeys: MarketKeys = {
       market: marketAddress,
       yesMint: marketAccount.yesMint as PublicKey,
@@ -54,9 +62,10 @@ export async function POST(request: Request) {
       program,
       usdcMint: config.usdcMint as PublicKey,
     });
-    const phoenix = await PhoenixWrapper.connect(connection, process.env.NEXT_PUBLIC_SOLANA_CLUSTER ?? "devnet");
+    const phoenix = await PhoenixWrapper.connect(connection, envValue("NEXT_PUBLIC_SOLANA_CLUSTER", "SOLANA_CLUSTER") ?? "devnet");
     const sizeAtoms = parseContractsToAtoms(body.sizeContracts);
     if (sizeAtoms <= 0n) return Response.json({ error: "Size must be greater than zero" }, { status: 400 });
+    await ensurePhoenixSeat({ connection, phoenixMarket, trader: user });
 
     const ctx = { meridian, phoenix, user, market: marketKeys, phoenixMarket };
     const tradeIxs =
@@ -79,6 +88,13 @@ export async function POST(request: Request) {
   } catch (err: any) {
     return Response.json({ error: err?.message ?? String(err) }, { status: 500 });
   }
+}
+
+function outcomeName(outcome: any): "unsettled" | "yesWins" | "noWins" {
+  if (!outcome || typeof outcome !== "object") return "unsettled";
+  if ("yesWins" in outcome) return "yesWins";
+  if ("noWins" in outcome) return "noWins";
+  return "unsettled";
 }
 
 function parseContractsToAtoms(value: string): bigint {

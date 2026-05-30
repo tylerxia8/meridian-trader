@@ -5,8 +5,8 @@
 //
 // The admin wallet must hold at least PHOENIX_SMOKE_USDC_UNITS demo USDC in
 // its associated token account. The script mints a matched Meridian pair, uses
-// the YES token as Phoenix base inventory, places a tiny ask, and verifies it
-// appears on the linked Phoenix book.
+// the YES token as Phoenix base inventory, places tiny bid/ask orders, and
+// verifies two-sided liquidity appears on the linked Phoenix book.
 import "dotenv/config";
 import * as anchor from "@coral-xyz/anchor";
 import { AnchorProvider, BN, Program } from "@coral-xyz/anchor";
@@ -64,9 +64,12 @@ async function main(): Promise<void> {
 
   const smokeUsdcUnits = BigInt(envNumber("PHOENIX_SMOKE_USDC_UNITS", 1));
   const mintAmount = smokeUsdcUnits * ONE_USDC;
-  const price = envNumber("PHOENIX_SMOKE_ASK_PRICE", 0.60);
+  const askPrice = envNumber("PHOENIX_SMOKE_ASK_PRICE", 0.60);
+  const bidPrice = envNumber("PHOENIX_SMOKE_BID_PRICE", 0.40);
+  if (bidPrice >= askPrice) throw new Error("PHOENIX_SMOKE_BID_PRICE must be lower than PHOENIX_SMOKE_ASK_PRICE");
   const sizeBaseUnits = envNumber("PHOENIX_SMOKE_SIZE_BASE_UNITS", 0.01);
   const requiredBaseAtoms = BigInt(Math.round(sizeBaseUnits * 10 ** 6));
+  const requiredQuoteAtoms = BigInt(Math.ceil(bidPrice * sizeBaseUnits * 10 ** USDC_DECIMALS));
 
   console.log(`[phoenix:smoke] Meridian market: ${meridianMarket.toBase58()}`);
   console.log(`[phoenix:smoke] Phoenix market: ${phoenixMarket.toBase58()}`);
@@ -116,6 +119,12 @@ async function main(): Promise<void> {
   } else {
     console.log(`[phoenix:smoke] Reusing existing YES balance: ${yesBalance} raw units`);
   }
+  const quoteBalanceAfterMint = await tokenBalance(connection, userUsdc);
+  if (quoteBalanceAfterMint < requiredQuoteAtoms) {
+    throw new Error(
+      `Admin USDC ATA ${userUsdc.toBase58()} has ${quoteBalanceAfterMint} raw units; needs at least ${requiredQuoteAtoms} to seed the bid.`
+    );
+  }
 
   const seat = phoenixBook.getSeatAddress(admin.publicKey);
   const seatInfo = await connection.getAccountInfo(seat, "confirmed");
@@ -151,28 +160,38 @@ async function main(): Promise<void> {
     console.log("[phoenix:smoke] Phoenix seat is already approved");
   }
 
-  const priceInTicks = phoenixBook.floatPriceToTicks(price);
   const numBaseLots = phoenixBook.baseAtomsToBaseLots(Number(requiredBaseAtoms));
   if (numBaseLots <= 0) throw new Error("Smoke size is below the Phoenix base-lot size");
 
-  const orderPacket = Phoenix.getLimitOrderPacket({
-    side: Phoenix.Side.Ask,
-    priceInTicks,
+  const bidPacket = Phoenix.getLimitOrderPacket({
+    side: Phoenix.Side.Bid,
+    priceInTicks: phoenixBook.floatPriceToTicks(bidPrice),
     numBaseLots,
     clientOrderId: Date.now(),
   });
-  const placeIx = phoenixBook.createPlaceLimitOrderInstruction(orderPacket, admin.publicKey);
+  const askPacket = Phoenix.getLimitOrderPacket({
+    side: Phoenix.Side.Ask,
+    priceInTicks: phoenixBook.floatPriceToTicks(askPrice),
+    numBaseLots,
+    clientOrderId: Date.now() + 1,
+  });
+  const bidIx = phoenixBook.createPlaceLimitOrderInstruction(bidPacket, admin.publicKey);
+  const askIx = phoenixBook.createPlaceLimitOrderInstruction(askPacket, admin.publicKey);
 
-  console.log(`[phoenix:smoke] Placing ask: ${sizeBaseUnits} YES @ ${price} USDC`);
-  const txid = await sendAndConfirmTransaction(connection, new Transaction().add(placeIx), [admin], {
+  console.log(`[phoenix:smoke] Placing bid: ${sizeBaseUnits} YES @ ${bidPrice} USDC`);
+  console.log(`[phoenix:smoke] Placing ask: ${sizeBaseUnits} YES @ ${askPrice} USDC`);
+  const txid = await sendAndConfirmTransaction(connection, new Transaction().add(bidIx, askIx), [admin], {
     commitment: "confirmed",
   });
-  console.log(`[phoenix:smoke] Order tx: ${txid}`);
+  console.log(`[phoenix:smoke] Orders tx: ${txid}`);
 
   await phoenixClient.refreshMarket(phoenixMarket.toBase58());
   const ladder = phoenixClient.getUiLadder(phoenixMarket.toBase58(), 1);
+  const topBid = ladder.bids[0];
   const topAsk = ladder.asks[0];
+  if (!topBid) throw new Error("No bid found after placing Phoenix order");
   if (!topAsk) throw new Error("No ask found after placing Phoenix order");
+  console.log(`[phoenix:smoke] Top bid price=${topBid.price} size=${topBid.quantity}`);
   console.log(`[phoenix:smoke] Top ask price=${topAsk.price} size=${topAsk.quantity}`);
 }
 

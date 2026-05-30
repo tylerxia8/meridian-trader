@@ -3,6 +3,7 @@ import { Connection, Keypair, PublicKey, Transaction } from "@solana/web3.js";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { MeridianClient, MarketKeys } from "@/lib/meridian";
+import { envValue } from "@/lib/server/env";
 
 type RedeemKind = "pair" | "yes" | "no";
 
@@ -18,8 +19,8 @@ export async function POST(request: Request) {
       return Response.json({ error: "Missing redeem request fields" }, { status: 400 });
     }
 
-    const rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_URL ?? process.env.SOLANA_RPC_URL ?? "https://api.devnet.solana.com";
-    const programId = process.env.NEXT_PUBLIC_MERIDIAN_PROGRAM_ID ?? process.env.MERIDIAN_PROGRAM_ID;
+    const rpcUrl = envValue("NEXT_PUBLIC_SOLANA_RPC_URL", "SOLANA_RPC_URL") ?? "https://api.devnet.solana.com";
+    const programId = envValue("NEXT_PUBLIC_MERIDIAN_PROGRAM_ID", "MERIDIAN_PROGRAM_ID");
     if (!programId) return Response.json({ error: "Missing Meridian program id" }, { status: 500 });
 
     const connection = new Connection(rpcUrl, "confirmed");

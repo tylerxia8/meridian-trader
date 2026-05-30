@@ -18,6 +18,7 @@
     "config:update": "tsx scripts/update-config.ts",
     "fast:demo": "tsx scripts/fast-demo.ts",
     "demo:market": "tsx scripts/create-demo-market.ts",
+    "trade:demo": "tsx scripts/create-tradable-demo.ts",
     "phoenix:probe": "tsx scripts/phoenix-probe.ts",
     "phoenix:link": "tsx scripts/link-phoenix.ts",
     "phoenix:create": "tsx scripts/create-phoenix-market.ts",

@@ -87,6 +87,26 @@ export function TradePanel({
     }
   }
 
+  async function prepareSeat() {
+    if (!connected || !publicKey || !phoenixMarket) {
+      setStatus("Connect a wallet and select a Phoenix-linked market first.");
+      return;
+    }
+    setStatus("Preparing Phoenix seat");
+    try {
+      const response = await fetch("/api/phoenix-seat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ phoenixMarket, user: publicKey.toBase58() }),
+      });
+      const payload = (await response.json()) as { signature?: string | null; error?: string };
+      if (!response.ok) throw new Error(payload.error ?? "Phoenix seat setup failed");
+      setStatus(payload.signature ? `Phoenix seat ready: ${payload.signature.slice(0, 8)}...${payload.signature.slice(-8)}` : "Phoenix seat already ready");
+    } catch (err: any) {
+      setStatus(err?.message ?? "Phoenix seat setup failed");
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div>
@@ -114,6 +134,16 @@ export function TradePanel({
       ) : null}
 
       <RoutePreview hasPhoenix={Boolean(phoenixMarket)} />
+
+      {connected && phoenixMarket && !expired ? (
+        <button
+          type="button"
+          onClick={prepareSeat}
+          className="w-full rounded border border-slate-700 px-3 py-2 text-xs text-slate-300 transition hover:border-slate-500"
+        >
+          Prepare Phoenix seat
+        </button>
+      ) : null}
 
       <div className="grid grid-cols-2 gap-2 pt-2">
         <ActionButton

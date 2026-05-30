@@ -152,6 +152,8 @@ npm run demo:status
 npm run phoenix:probe
 # To create a fresh non-expired Meridian demo market:
 # npm run demo:market
+# To create a Phoenix-linked, two-sided-liquidity trading demo:
+# npm run trade:demo
 # To create and link a Phoenix Yes/USDC market for an existing Meridian market:
 # MERIDIAN_MARKET=<market_account> npm run phoenix:create
 # To mint YES inventory and place a tiny ask on a linked Phoenix book:
