@@ -1,23 +1,8 @@
 "use client";
-// One book, two perspectives (PRD section). The same Yes-vs-USDC bids/asks
-// are displayed on both sides:
-//   - "Yes" view: bids = Buy-Yes, asks = Sell-Yes
-//   - "No" view: bids = Sell-Yes (= Buy-No), asks = Buy-Yes (= Sell-No)
-// Inverted by `1 - yesPrice` for the price column.
-//
-// Mock data only in this scaffold — Phase 7 wires PhoenixWrapper.getTopOfBook
-// against the live Phoenix market.
 
 interface Level {
   priceCents: number;
   sizeBaseAtoms: bigint;
-}
-
-function mockLadder(midCents: number, side: "bid" | "ask"): Level[] {
-  return Array.from({ length: 5 }, (_, i) => ({
-    priceCents: side === "bid" ? midCents - i : midCents + i + 1,
-    sizeBaseAtoms: BigInt(2000000 * (5 - i)),
-  }));
 }
 
 export function OrderBookView({
@@ -33,26 +18,30 @@ export function OrderBookView({
   bestBidSize: number | null;
   bestAskSize: number | null;
 }) {
-  const yesBids = withLiveTop(mockLadder(yesPriceCents - 1, "bid"), bestBidCents, bestBidSize);
-  const yesAsks = withLiveTop(mockLadder(yesPriceCents, "ask"), bestAskCents, bestAskSize);
+  const yesBids = liveLevel(bestBidCents, bestBidSize);
+  const yesAsks = liveLevel(bestAskCents, bestAskSize);
 
   return (
-    <div className="grid grid-cols-2 gap-4 text-sm">
-      <Side label="Yes" yesBids={yesBids} yesAsks={yesAsks} flip={false} />
-      <Side label="No" yesBids={yesBids} yesAsks={yesAsks} flip={true} />
+    <div className="space-y-3">
+      {bestBidCents == null && bestAskCents == null ? (
+        <div className="rounded border border-slate-800 bg-slate-950/40 px-3 py-2 text-xs text-slate-500">
+          No live Phoenix liquidity is available for this strike yet.
+        </div>
+      ) : null}
+      <div className="grid grid-cols-2 gap-4 text-sm">
+        <Side label="Yes" yesBids={yesBids} yesAsks={yesAsks} flip={false} referencePriceCents={yesPriceCents} />
+        <Side label="No" yesBids={yesBids} yesAsks={yesAsks} flip referencePriceCents={100 - yesPriceCents} />
+      </div>
     </div>
   );
 }
 
-function withLiveTop(levels: Level[], priceCents: number | null, size: number | null): Level[] {
-  if (priceCents == null) return levels;
-  return [
-    {
-      priceCents,
-      sizeBaseAtoms: BigInt(Math.max(0, Math.round((size ?? 0) * 1_000_000))),
-    },
-    ...levels.slice(1),
-  ];
+function liveLevel(priceCents: number | null, size: number | null): Level[] {
+  if (priceCents == null) return [];
+  return [{
+    priceCents,
+    sizeBaseAtoms: BigInt(Math.max(0, Math.round((size ?? 0) * 1_000_000))),
+  }];
 }
 
 function Side({
@@ -60,21 +49,25 @@ function Side({
   yesBids,
   yesAsks,
   flip,
+  referencePriceCents,
 }: {
   label: string;
   yesBids: Level[];
   yesAsks: Level[];
   flip: boolean;
+  referencePriceCents: number;
 }) {
-  // For the No perspective, bids ↔ asks AND prices are mirrored to (100 - p) cents.
   const bids = flip ? yesAsks : yesBids;
   const asks = flip ? yesBids : yesAsks;
-  const px = (c: number) => `${flip ? 100 - c : c}¢`;
+  const px = (c: number) => `${flip ? 100 - c : c}c`;
   const sz = (n: bigint) => (Number(n) / 1_000_000).toFixed(2);
 
   return (
     <div>
-      <div className="mb-2 text-xs uppercase tracking-wider text-slate-500">{label} book</div>
+      <div className="mb-2 flex items-center justify-between gap-2 text-xs uppercase tracking-wider text-slate-500">
+        <span>{label} book</span>
+        <span className="normal-case tracking-normal">ref {referencePriceCents}c</span>
+      </div>
       <table className="w-full border-collapse">
         <thead>
           <tr className="text-xs text-slate-500">
@@ -86,15 +79,15 @@ function Side({
           </tr>
         </thead>
         <tbody>
-          {Array.from({ length: 5 }).map((_, i) => (
+          {Array.from({ length: 3 }).map((_, i) => (
             <tr key={i}>
-              <td className="text-yes">{bids[i] ? px(bids[i].priceCents) : ""}</td>
-              <td className="text-right text-slate-400">
-                {bids[i] ? sz(bids[i].sizeBaseAtoms) : ""}
-              </td>
+              <td className={bids[i] ? "text-yes" : "text-slate-700"}>{bids[i] ? px(bids[i].priceCents) : "empty"}</td>
+              <td className="text-right text-slate-400">{bids[i] ? sz(bids[i].sizeBaseAtoms) : ""}</td>
               <td></td>
               <td className="text-slate-400">{asks[i] ? sz(asks[i].sizeBaseAtoms) : ""}</td>
-              <td className="text-right text-no">{asks[i] ? px(asks[i].priceCents) : ""}</td>
+              <td className={asks[i] ? "text-right text-no" : "text-right text-slate-700"}>
+                {asks[i] ? px(asks[i].priceCents) : "empty"}
+              </td>
             </tr>
           ))}
         </tbody>

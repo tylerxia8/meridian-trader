@@ -65,6 +65,15 @@ export async function POST(request: Request) {
     const phoenix = await PhoenixWrapper.connect(connection, envValue("NEXT_PUBLIC_SOLANA_CLUSTER", "SOLANA_CLUSTER") ?? "devnet");
     const sizeAtoms = parseContractsToAtoms(body.sizeContracts);
     if (sizeAtoms <= 0n) return Response.json({ error: "Size must be greater than zero" }, { status: 400 });
+    const topOfBook = await phoenix.getTopOfBook(phoenixMarket);
+    const needsAsk = body.action === "buyYes" || body.action === "sellNo";
+    const needsBid = body.action === "sellYes" || body.action === "buyNo";
+    if (needsAsk && topOfBook.bestAskPriceInUsdc == null) {
+      return Response.json({ error: "No Phoenix ask liquidity is available for this trade" }, { status: 409 });
+    }
+    if (needsBid && topOfBook.bestBidPriceInUsdc == null) {
+      return Response.json({ error: "No Phoenix bid liquidity is available for this trade" }, { status: 409 });
+    }
     await ensurePhoenixSeat({ connection, phoenixMarket, trader: user });
 
     const ctx = { meridian, phoenix, user, market: marketKeys, phoenixMarket };

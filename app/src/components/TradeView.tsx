@@ -211,6 +211,8 @@ export function TradeView({
             phoenixMarket={selected.phoenixMarket ?? null}
             outcome={selected.outcome ?? null}
             expiryTs={selected.expiryTs ?? null}
+            bestBidCents={selected.bestBidCents ?? null}
+            bestAskCents={selected.bestAskCents ?? null}
             balances={balances}
             balanceStatus={balanceStatus}
             allowed={allowed}

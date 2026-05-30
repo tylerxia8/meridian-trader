@@ -13,6 +13,8 @@ interface Props {
   phoenixMarket: string | null;
   outcome: "unsettled" | "yesWins" | "noWins" | null;
   expiryTs?: number | null;
+  bestBidCents?: number | null;
+  bestAskCents?: number | null;
   balances: UserBalances;
   balanceStatus: string | null;
   allowed: AllowedAction[];
@@ -27,6 +29,8 @@ export function TradePanel({
   phoenixMarket,
   outcome,
   expiryTs,
+  bestBidCents,
+  bestAskCents,
   balances,
   balanceStatus,
   allowed,
@@ -38,6 +42,8 @@ export function TradePanel({
   const { connection } = useConnection();
   const noPriceCents = 100 - yesPriceCents;
   const expired = Boolean(expiryTs && expiryTs <= Math.floor(Date.now() / 1000));
+  const hasBid = bestBidCents != null;
+  const hasAsk = bestAskCents != null;
   const unavailableReason =
     !marketAddress
       ? "Select a live market before trading."
@@ -47,7 +53,11 @@ export function TradePanel({
         ? "This market is already settled."
         : !phoenixMarket
           ? "This strike is not linked to a Phoenix book yet."
-          : null;
+      : null;
+  const liquidityMessage =
+    phoenixMarket && !expired && outcome === "unsettled" && (!hasBid || !hasAsk)
+      ? `Live liquidity missing: ${!hasBid && !hasAsk ? "bid and ask" : !hasBid ? "bid" : "ask"}.`
+      : null;
 
   async function handleClick(action: AllowedAction) {
     if (!connected || !publicKey) {
@@ -132,6 +142,11 @@ export function TradePanel({
           {outcome && outcome !== "unsettled" ? `${outcomeLabel(outcome)}. ${unavailableReason}` : unavailableReason}
         </div>
       ) : null}
+      {liquidityMessage ? (
+        <div className="rounded border border-slate-700 bg-slate-950/40 px-3 py-2 text-xs text-slate-400">
+          {liquidityMessage} Market orders are only enabled for sides with live Phoenix depth.
+        </div>
+      ) : null}
 
       <RoutePreview hasPhoenix={Boolean(phoenixMarket)} />
 
@@ -149,27 +164,27 @@ export function TradePanel({
         <ActionButton
           label="Buy Yes"
           color="yes"
-          enabled={connected && !unavailableReason && !guidance && allowed.includes("buyYes")}
+          enabled={connected && hasAsk && !unavailableReason && !guidance && allowed.includes("buyYes")}
           onClick={() => handleClick("buyYes")}
         />
         <ActionButton
           label="Sell Yes"
           color="yes"
           variant="outline"
-          enabled={connected && !unavailableReason && !guidance && allowed.includes("sellYes")}
+          enabled={connected && hasBid && !unavailableReason && !guidance && allowed.includes("sellYes")}
           onClick={() => handleClick("sellYes")}
         />
         <ActionButton
           label="Buy No"
           color="no"
-          enabled={connected && !unavailableReason && !guidance && allowed.includes("buyNo")}
+          enabled={connected && hasBid && !unavailableReason && !guidance && allowed.includes("buyNo")}
           onClick={() => handleClick("buyNo")}
         />
         <ActionButton
           label="Sell No"
           color="no"
           variant="outline"
-          enabled={connected && !unavailableReason && !guidance && allowed.includes("sellNo")}
+          enabled={connected && hasAsk && !unavailableReason && !guidance && allowed.includes("sellNo")}
           onClick={() => handleClick("sellNo")}
         />
       </div>
