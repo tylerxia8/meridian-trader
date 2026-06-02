@@ -14,13 +14,28 @@ type PositionRow = {
   no: bigint;
 };
 
+type RedeemTarget = {
+  row: PositionRow;
+  redeem: { kind: "pair" | "yes" | "no"; amount: bigint };
+};
+
 export function PortfolioView({ markets }: { markets: LiveMarket[] }) {
   const { publicKey, connected, sendTransaction } = useWallet();
   const { connection } = useConnection();
   const [rows, setRows] = useState<PositionRow[]>([]);
   const [status, setStatus] = useState<string | null>(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
+  const [bulkStatus, setBulkStatus] = useState<string | null>(null);
+  const [bulkRedeeming, setBulkRedeeming] = useState(false);
   const visibleMarkets = useMemo(() => markets.filter((market) => market.configuredFeed), [markets]);
+  const redeemableTargets = useMemo<RedeemTarget[]>(
+    () =>
+      rows.flatMap((row) => {
+        const redeem = redeemable(row);
+        return redeem ? [{ row, redeem }] : [];
+      }),
+    [rows]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -71,8 +86,33 @@ export function PortfolioView({ markets }: { markets: LiveMarket[] }) {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Portfolio</h1>
-        {status ? <p className="mt-1 text-sm text-slate-500">{status}</p> : null}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold">Portfolio</h1>
+            {status ? <p className="mt-1 text-sm text-slate-500">{status}</p> : null}
+          </div>
+          {redeemableTargets.length > 1 ? (
+            <button
+              type="button"
+              disabled={bulkRedeeming}
+              onClick={() =>
+                redeemAll({
+                  targets: redeemableTargets,
+                  publicKey,
+                  sendTransaction,
+                  connection,
+                  setBulkStatus,
+                  setBulkRedeeming,
+                  refresh: () => setRefreshNonce((nonce) => nonce + 1),
+                })
+              }
+              className="rounded border border-yes/60 px-3 py-2 text-xs text-yes transition hover:bg-yes/10 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {bulkRedeeming ? "Redeeming all" : `Redeem all ${redeemableTargets.length}`}
+            </button>
+          ) : null}
+        </div>
+        {bulkStatus ? <p className="mt-2 text-xs text-amber-300">{bulkStatus}</p> : null}
       </div>
 
       {rows.length === 0 && !status ? (
@@ -217,6 +257,62 @@ function redeemable(row: PositionRow): { kind: "pair" | "yes" | "no"; amount: bi
   if (row.market.outcome === "noWins" && row.no > 0n) return { kind: "no", amount: row.no };
   const matched = row.yes < row.no ? row.yes : row.no;
   return matched > 0n ? { kind: "pair", amount: matched } : null;
+}
+
+async function redeemAll({
+  targets,
+  publicKey,
+  sendTransaction,
+  connection,
+  setBulkStatus,
+  setBulkRedeeming,
+  refresh,
+}: {
+  targets: RedeemTarget[];
+  publicKey: PublicKey | null;
+  sendTransaction: (tx: Transaction, connection: Connection) => Promise<string>;
+  connection: Connection;
+  setBulkStatus: (status: string | null) => void;
+  setBulkRedeeming: (redeeming: boolean) => void;
+  refresh: () => void;
+}) {
+  if (!publicKey || targets.length === 0) return;
+  setBulkRedeeming(true);
+  let completed = 0;
+  try {
+    for (const [index, target] of targets.entries()) {
+      setBulkStatus(`Preparing redemption ${index + 1} of ${targets.length}`);
+      const response = await fetch("/api/redeem", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          kind: target.redeem.kind,
+          marketAddress: target.row.market.address,
+          user: publicKey.toBase58(),
+          amountAtoms: target.redeem.amount.toString(),
+        }),
+      });
+      const payload = (await response.json()) as { transaction?: string; error?: string };
+      if (!response.ok || !payload.transaction) throw new Error(payload.error ?? "Redeem transaction build failed");
+      const signature = await sendTransaction(Transaction.from(base64ToBytes(payload.transaction)), connection);
+      setBulkStatus(`Submitted redemption ${index + 1} of ${targets.length}: ${shortSignature(signature)}`);
+      refresh();
+      const confirmation = await waitForSignatureConfirmation(connection, signature);
+      completed += 1;
+      setBulkStatus(
+        confirmation === "timeout"
+          ? `Submitted ${completed} of ${targets.length}; latest is still awaiting confirmation`
+          : `Confirmed ${completed} of ${targets.length} redemptions`
+      );
+      refresh();
+    }
+    setBulkStatus(`Redeemed ${completed} position${completed === 1 ? "" : "s"}`);
+  } catch (err: any) {
+    setBulkStatus(`Redeemed ${completed} of ${targets.length}; stopped: ${err?.message ?? "redeem failed"}`);
+  } finally {
+    setBulkRedeeming(false);
+    window.setTimeout(refresh, 2500);
+  }
 }
 
 function formatContracts(raw: bigint): string {
