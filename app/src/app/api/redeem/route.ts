@@ -1,9 +1,7 @@
-import { AnchorProvider, BN, Program } from "@coral-xyz/anchor";
-import { Connection, Keypair, PublicKey, Transaction } from "@solana/web3.js";
-import { existsSync, readFileSync } from "node:fs";
-import path from "node:path";
-import { MeridianClient, MarketKeys } from "@/lib/meridian";
-import { envValue } from "@/lib/server/env";
+import { BN } from "@coral-xyz/anchor";
+import { PublicKey, Transaction } from "@solana/web3.js";
+import { MeridianClient } from "@/lib/meridian";
+import { createMeridianServerContext, marketKeysFor, outcomeName } from "@/lib/server/meridian";
 
 type RedeemKind = "pair" | "yes" | "no";
 
@@ -25,23 +23,7 @@ export async function POST(request: Request) {
       return Response.json({ error: "Amount must be a positive integer atom value" }, { status: 400 });
     }
 
-    const rpcUrl = envValue("NEXT_PUBLIC_SOLANA_RPC_URL", "SOLANA_RPC_URL") ?? "https://api.devnet.solana.com";
-    const programId = envValue("NEXT_PUBLIC_MERIDIAN_PROGRAM_ID", "MERIDIAN_PROGRAM_ID");
-    if (!programId) return Response.json({ error: "Missing Meridian program id" }, { status: 500 });
-
-    const connection = new Connection(rpcUrl, "confirmed");
-    const dummy = Keypair.generate();
-    const wallet = {
-      publicKey: dummy.publicKey,
-      signTransaction: async <T extends Transaction>(tx: T) => tx,
-      signAllTransactions: async <T extends Transaction>(txs: T[]) => txs,
-    };
-    const provider = new AnchorProvider(connection, wallet as any, { commitment: "confirmed" });
-    const idl = JSON.parse(readFileSync(findIdlPath(), "utf8"));
-    idl.address = programId;
-    const program = new Program(idl, provider);
-    const configKey = PublicKey.findProgramAddressSync([Buffer.from("config")], program.programId)[0];
-    const config = await (program.account as any).config.fetch(configKey);
+    const { connection, provider, program, config } = await createMeridianServerContext();
     const marketAddress = new PublicKey(body.marketAddress);
     const marketAccount = await (program.account as any).market.fetch(marketAddress);
     const outcome = outcomeName(marketAccount.outcome);
@@ -51,12 +33,7 @@ export async function POST(request: Request) {
     if (body.kind === "no" && outcome !== "noWins") {
       return Response.json({ error: "NO tokens are only redeemable after NO wins" }, { status: 400 });
     }
-    const marketKeys: MarketKeys = {
-      market: marketAddress,
-      yesMint: marketAccount.yesMint as PublicKey,
-      noMint: marketAccount.noMint as PublicKey,
-      vault: PublicKey.findProgramAddressSync([Buffer.from("vault"), marketAddress.toBuffer()], program.programId)[0],
-    };
+    const marketKeys = marketKeysFor(program.programId, marketAddress, marketAccount);
     const user = new PublicKey(body.user);
     const meridian = new MeridianClient({ provider, program, usdcMint: config.usdcMint as PublicKey });
     const amount = new BN(body.amountAtoms);
@@ -83,21 +60,4 @@ export async function POST(request: Request) {
 
 function isRedeemKind(value: string): value is RedeemKind {
   return value === "pair" || value === "yes" || value === "no";
-}
-
-function outcomeName(outcome: any): "unsettled" | "yesWins" | "noWins" {
-  if (!outcome || typeof outcome !== "object") return "unsettled";
-  if ("yesWins" in outcome) return "yesWins";
-  if ("noWins" in outcome) return "noWins";
-  return "unsettled";
-}
-
-function findIdlPath(): string {
-  const candidates = [
-    path.resolve(process.cwd(), "..", "target", "idl", "meridian.json"),
-    path.resolve(process.cwd(), "target", "idl", "meridian.json"),
-  ];
-  const found = candidates.find((candidate) => existsSync(candidate));
-  if (!found) throw new Error("Missing target/idl/meridian.json; run anchor build");
-  return found;
 }
