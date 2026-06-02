@@ -16,6 +16,7 @@
     "lifecycle:demo": "tsx scripts/lifecycle.ts",
     "demo:status": "tsx scripts/demo-status.ts",
     "tradable:status": "tsx scripts/tradable-status.ts",
+    "wallet:status": "tsx scripts/wallet-readiness.ts",
     "config:update": "tsx scripts/update-config.ts",
     "fast:demo": "tsx scripts/fast-demo.ts",
     "demo:market": "tsx scripts/create-demo-market.ts",

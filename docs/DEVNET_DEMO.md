@@ -30,6 +30,7 @@ Run these from WSL in the project root:
 npm run lifecycle:demo
 npm run demo:status
 npm run tradable:status
+WALLET_PUBLIC_KEY=<wallet> npm run wallet:status
 npm run trade:demo
 npm run create:markets
 SETTLEMENT_DRY_RUN=true SETTLEMENT_MAX_RETRIES=1 npm run settle:markets
@@ -47,6 +48,9 @@ Notes:
   IDL, and demo USDC balance before spending transactions.
 - `npm run tradable:status` lists active Phoenix-linked markets, current
   bid/ask liquidity, supported trade actions, and the trade page to open.
+- `npm run wallet:status` checks a wallet's SOL, demo USDC, and whether any
+  active liquid Phoenix market is available. It uses `WALLET_PUBLIC_KEY` or
+  falls back to `ANCHOR_WALLET`.
 - `npm run create:markets` skips after 9:30am ET unless
   `MORNING_ALLOW_AFTER_OPEN=true` is set.
 - The settlement job skips old fake-feed demo markets by design.

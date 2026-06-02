@@ -135,6 +135,7 @@ Copy the `meridian` program ID into both `MERIDIAN_PROGRAM_ID` and `NEXT_PUBLIC_
 npm run lifecycle:demo
 npm run demo:status
 npm run tradable:status
+WALLET_PUBLIC_KEY=<wallet> npm run wallet:status
 
 # Create daily configured-feed markets
 npm run create:markets
