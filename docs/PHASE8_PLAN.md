@@ -37,11 +37,24 @@ Known validation caveat:
 
 Goal: make `anchor test` reproducible from a fresh WSL checkout.
 
-- Add a documented local-test workflow that generates `keypairs/admin.json`.
-- Decide whether local integration tests should:
-  - temporarily sync to a local generated program id, or
-  - use a committed local test keypair distinct from devnet deploy keys.
-- Add a script such as `npm run test:program:local` that hides the setup details.
+Current workflow:
+
+```bash
+npm run test:program:local
+```
+
+This calls `scripts/run-local-anchor-test.sh`, which:
+
+- Generates `keypairs/admin.json` if missing.
+- Generates `target/deploy/meridian-keypair.json` if missing.
+- Temporarily runs `anchor keys sync` so local test ids match.
+- Runs `anchor test` against a local validator.
+- Restores the committed devnet program id in `Anchor.toml` and `lib.rs` on exit.
+
+Remaining work:
+
+- Run this command in WSL after the local Solana toolchain is loaded. Use Node 24+ because current Pyth packages declare Node 22/24 engine requirements.
+- If it exposes test failures, fix the tests/program behavior rather than changing the devnet program id.
 - Keep the deployed devnet program id stable for demos.
 
 ### 2. Pyth Parser Hardening
@@ -107,4 +120,3 @@ Goal: make automation safe to run without babysitting.
 - Settlement runbook.
 - Admin override policy.
 - Multisig recommendation before any non-devnet deployment.
-

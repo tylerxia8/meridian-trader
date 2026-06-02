@@ -11,6 +11,7 @@
   "scripts": {
     "build:program": "anchor build",
     "test:program": "anchor test",
+    "test:program:local": "bash scripts/run-local-anchor-test.sh",
     "test:program:skip-deploy": "anchor test --skip-deploy",
     "deploy:devnet": "anchor deploy --provider.cluster devnet",
     "lifecycle:demo": "tsx scripts/lifecycle.ts",
@@ -53,7 +54,7 @@
     "typescript": "^5.4.0"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=24.0.0"
   },
   "overrides": {
     "react": "18.3.1",

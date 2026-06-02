@@ -46,7 +46,7 @@ docs/                   Architecture, devnet notes, and risks
 
 | Tool | Recommended | Verify |
 |---|---:|---|
-| Node.js | 20+ | `node --version` |
+| Node.js | 24+ | `node --version` |
 | Rust | 1.75+ | `rustc --version` |
 | Solana CLI | 1.18+ | `solana --version` |
 | Anchor CLI | 1.0.2 currently used | `anchor --version` |
@@ -56,10 +56,11 @@ WSL 2 + Ubuntu is strongly recommended on Windows. Avoid mixing a Windows-path c
 ## WSL Setup
 
 ```bash
-# Node.js 20 via nvm
+# Node.js 24 via nvm
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
 source ~/.bashrc
-nvm install 20
+nvm install 24
+nvm use 24
 
 # Rust
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -80,6 +81,7 @@ avm use 1.0.2
 ```bash
 npm install --ignore-scripts
 anchor build
+npm run test:program:local
 npm run lint
 npm run typecheck
 npm test --workspace=automation
