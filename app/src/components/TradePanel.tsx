@@ -99,7 +99,7 @@ export function TradePanel({
   }
 
   async function prepareSeat() {
-    if (!connected || !publicKey || !phoenixMarket) {
+    if (!connected || !publicKey || !marketAddress || !phoenixMarket) {
       setStatus("Connect a wallet and select a Phoenix-linked market first.");
       return;
     }
@@ -108,7 +108,7 @@ export function TradePanel({
       const response = await fetch("/api/phoenix-seat", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ phoenixMarket, user: publicKey.toBase58() }),
+        body: JSON.stringify({ marketAddress, phoenixMarket, user: publicKey.toBase58() }),
       });
       const payload = (await response.json()) as { signature?: string | null; error?: string };
       if (!response.ok) throw new Error(payload.error ?? "Phoenix seat setup failed");
