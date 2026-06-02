@@ -44,6 +44,8 @@ export function TradePanel({
   const expired = Boolean(expiryTs && expiryTs <= Math.floor(Date.now() / 1000));
   const hasBid = bestBidCents != null;
   const hasAsk = bestAskCents != null;
+  const contracts = Number(size);
+  const validContracts = Number.isFinite(contracts) && contracts > 0;
   const unavailableReason =
     !marketAddress
       ? "Select a live market before trading."
@@ -68,8 +70,7 @@ export function TradePanel({
       setStatus(unavailableReason);
       return;
     }
-    const contracts = Number(size);
-    if (!Number.isFinite(contracts) || contracts <= 0) {
+    if (!validContracts) {
       setStatus("Enter a positive contract size.");
       return;
     }
@@ -131,6 +132,13 @@ export function TradePanel({
       </div>
 
       <BalanceSummary balances={balances} balanceStatus={balanceStatus} />
+
+      <ExecutionPreview
+        contracts={validContracts ? contracts : null}
+        bestBidCents={bestBidCents ?? null}
+        bestAskCents={bestAskCents ?? null}
+        unavailable={Boolean(unavailableReason)}
+      />
 
       {guidance ? <div className="text-sm text-amber-400">{guidance}</div> : null}
 
@@ -199,6 +207,55 @@ export function TradePanel({
   );
 }
 
+function ExecutionPreview({
+  contracts,
+  bestBidCents,
+  bestAskCents,
+  unavailable,
+}: {
+  contracts: number | null;
+  bestBidCents: number | null;
+  bestAskCents: number | null;
+  unavailable: boolean;
+}) {
+  const rows = [
+    {
+      label: "Buy Yes",
+      value: bestAskCents == null ? "Needs ask liquidity" : `Pay ${formatUsd(bestAskCents, contracts)}`,
+      enabled: bestAskCents != null && !unavailable && contracts != null,
+    },
+    {
+      label: "Sell Yes",
+      value: bestBidCents == null ? "Needs bid liquidity" : `Receive ${formatUsd(bestBidCents, contracts)}`,
+      enabled: bestBidCents != null && !unavailable && contracts != null,
+    },
+    {
+      label: "Buy No",
+      value: bestBidCents == null ? "Needs bid liquidity" : `Pay ${formatUsd(100 - bestBidCents, contracts)}`,
+      enabled: bestBidCents != null && !unavailable && contracts != null,
+    },
+    {
+      label: "Sell No",
+      value: bestAskCents == null ? "Needs ask liquidity" : `Receive ${formatUsd(100 - bestAskCents, contracts)}`,
+      enabled: bestAskCents != null && !unavailable && contracts != null,
+    },
+  ];
+
+  return (
+    <div className="rounded border border-slate-800 bg-slate-950/40 px-3 py-2">
+      <div className="mb-2 text-xs uppercase tracking-wider text-slate-500">Estimated execution</div>
+      <div className="space-y-1 text-xs">
+        {rows.map((row) => (
+          <div key={row.label} className="flex items-center justify-between gap-3">
+            <span className={row.enabled ? "text-slate-300" : "text-slate-600"}>{row.label}</span>
+            <span className={row.enabled ? "text-slate-400" : "text-slate-600"}>{contracts == null ? "Enter size" : row.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function RoutePreview({ hasPhoenix }: { hasPhoenix: boolean }) {
   const rows: Array<{ action: string; route: string }> = [
     { action: "Buy Yes", route: "Phoenix buy YES from asks" },
@@ -254,6 +311,11 @@ function formatContracts(raw: bigint): string {
   const frac = raw % 1_000_000n;
   if (frac === 0n) return whole.toString();
   return `${whole}.${frac.toString().padStart(6, "0").replace(/0+$/, "")}`;
+}
+
+function formatUsd(centsPerContract: number, contracts: number | null): string {
+  if (contracts == null) return "-";
+  return `$${((centsPerContract * contracts) / 100).toFixed(2)}`;
 }
 
 function labelFor(action: AllowedAction): string {
