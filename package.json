@@ -15,6 +15,7 @@
     "deploy:devnet": "anchor deploy --provider.cluster devnet",
     "lifecycle:demo": "tsx scripts/lifecycle.ts",
     "demo:status": "tsx scripts/demo-status.ts",
+    "tradable:status": "tsx scripts/tradable-status.ts",
     "config:update": "tsx scripts/update-config.ts",
     "fast:demo": "tsx scripts/fast-demo.ts",
     "demo:market": "tsx scripts/create-demo-market.ts",

@@ -29,6 +29,7 @@ Run these from WSL in the project root:
 ```bash
 npm run lifecycle:demo
 npm run demo:status
+npm run tradable:status
 npm run trade:demo
 npm run create:markets
 SETTLEMENT_DRY_RUN=true SETTLEMENT_MAX_RETRIES=1 npm run settle:markets
@@ -43,6 +44,8 @@ Notes:
 - `npm run trade:demo` creates a fresh Meridian market, creates/links a
   Phoenix book, and seeds small bid/ask liquidity so browser trades have a
   live order book to hit.
+- `npm run tradable:status` lists active Phoenix-linked markets, current
+  bid/ask liquidity, supported trade actions, and the trade page to open.
 - `npm run create:markets` skips after 9:30am ET unless
   `MORNING_ALLOW_AFTER_OPEN=true` is set.
 - The settlement job skips old fake-feed demo markets by design.
