@@ -30,6 +30,9 @@ export default async function MarketsPage() {
       : [];
   const activeConfigured = activeMarkets.filter((market) => market.configuredFeed).length;
   const activeDemo = activeMarkets.length - activeConfigured;
+  const activeTradable = activeMarkets.filter(
+    (market) => market.phoenixMarket && market.bestBidCents !== null && market.bestAskCents !== null
+  ).length;
 
   return (
     <div className="space-y-6">
@@ -43,6 +46,7 @@ export default async function MarketsPage() {
         {live.kind === "live" ? (
           <div className="flex gap-2 text-xs">
             <Badge tone={activeConfigured > 0 ? "ok" : "muted"}>{activeConfigured} real active</Badge>
+            <Badge tone={activeTradable > 0 ? "info" : "muted"}>{activeTradable} tradable</Badge>
             <Badge tone={activeDemo > 0 ? "warn" : "muted"}>{activeDemo} demo active</Badge>
           </div>
         ) : null}
@@ -105,6 +109,7 @@ export default async function MarketsPage() {
                     <th className="py-2">Market</th>
                     <th>Feed</th>
                     <th>Phoenix</th>
+                    <th>Liquidity</th>
                     <th>Expiry</th>
                     <th>Account</th>
                   </tr>
@@ -126,6 +131,11 @@ export default async function MarketsPage() {
                         <Badge tone={market.phoenixMarket ? "info" : "muted"}>
                           {market.phoenixMarket ? "linked" : "none"}
                         </Badge>
+                      </td>
+                      <td className="text-xs text-slate-400">
+                        {market.bestBidCents !== null || market.bestAskCents !== null
+                          ? `Bid ${formatPrice(market.bestBidCents)} / Ask ${formatPrice(market.bestAskCents)}`
+                          : "empty"}
                       </td>
                       <td>{formatTime(market.expiryTs)}</td>
                       <td>
@@ -171,6 +181,10 @@ function formatTime(ts: number): string {
     hour: "numeric",
     minute: "2-digit",
   }).format(new Date(ts * 1000));
+}
+
+function formatPrice(cents: number | null): string {
+  return cents === null ? "-" : `$${(cents / 100).toFixed(2)}`;
 }
 
 function shortAddress(address: string): string {

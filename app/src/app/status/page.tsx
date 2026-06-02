@@ -29,6 +29,9 @@ export default async function StatusPage() {
     (market) => market.outcome === "unsettled" && market.expiryTs > Math.floor(Date.now() / 1000)
   );
   const activeConfigured = active.filter((market) => market.configuredFeed);
+  const activeTradable = active.filter(
+    (market) => market.phoenixMarket && market.bestBidCents !== null && market.bestAskCents !== null
+  );
   const recentlySettled = live.markets
     .filter((market) => market.outcome !== "unsettled")
     .sort((a, b) => b.settlementTs - a.settlementTs)
@@ -41,14 +44,14 @@ export default async function StatusPage() {
           <h1 className="text-2xl font-semibold">Status</h1>
           <p className="mt-1 text-sm text-slate-400">Devnet market lifecycle, settlement, and Phoenix linkage.</p>
         </div>
-        <code className="rounded border border-slate-800 px-3 py-2 text-xs text-slate-400">npm run demo:status</code>
+        <code className="rounded border border-slate-800 px-3 py-2 text-xs text-slate-400">npm run tradable:status</code>
       </div>
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Metric label="Active" value={stats.active} />
+        <Metric label="Tradable Now" value={activeTradable.length} />
         <Metric label="Settled" value={stats.settled} detail={`${stats.yesWins} YES / ${stats.noWins} NO`} />
         <Metric label="Expired Pending" value={stats.expiredUnsettled} />
-        <Metric label="Phoenix Linked" value={stats.phoenixLinked} />
       </section>
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -61,6 +64,7 @@ export default async function StatusPage() {
       <ActionPanel
         activeConfigured={activeConfigured.length}
         activeDemo={active.length - activeConfigured.length}
+        activeTradable={activeTradable.length}
         pendingConfigured={pendingConfigured.length}
         pendingDemo={pendingDemo.length}
       />
@@ -128,17 +132,21 @@ export default async function StatusPage() {
 function ActionPanel({
   activeConfigured,
   activeDemo,
+  activeTradable,
   pendingConfigured,
   pendingDemo,
 }: {
   activeConfigured: number;
   activeDemo: number;
+  activeTradable: number;
   pendingConfigured: number;
   pendingDemo: number;
 }) {
   const message =
     pendingConfigured > 0
       ? "Configured-feed markets are expired and ready for settlement."
+      : activeTradable > 0
+        ? "At least one active Phoenix-linked market has bid/ask liquidity."
       : activeConfigured > 0
         ? "Real configured-feed markets are active."
         : activeDemo > 0
@@ -147,6 +155,8 @@ function ActionPanel({
   const command =
     pendingConfigured > 0
       ? "SETTLEMENT_MAX_RETRIES=1 npm run settle:markets"
+      : activeTradable > 0
+        ? "npm run tradable:status"
       : activeConfigured > 0
         ? "npm run demo:status"
         : "npm run create:markets";
