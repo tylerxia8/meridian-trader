@@ -29,7 +29,8 @@ export type LiveMarketStatus =
   | { kind: "unavailable"; reason: string };
 
 const DEFAULT_PUBKEY = PublicKey.default.toBase58();
-const LIVE_MARKETS_TIMEOUT_MS = 8_000;
+const LIVE_MARKETS_TIMEOUT_MS = Number(process.env.LIVE_MARKETS_TIMEOUT_MS ?? 15_000);
+const PHOENIX_BOOK_TIMEOUT_MS = Number(process.env.PHOENIX_BOOK_TIMEOUT_MS ?? 5_000);
 
 export async function fetchLiveMarkets(): Promise<LiveMarketStatus> {
   const rootEnv = readRootEnv();
@@ -164,13 +165,13 @@ async function hydratePhoenixTopOfBook(connection: Connection, markets: LiveMark
   const linked = markets.filter((market) => market.phoenixMarket);
   if (linked.length === 0) return;
   try {
-    const phoenix = await withTimeout(PhoenixWrapper.connect(connection, "devnet"), 4_000, "timed out connecting Phoenix");
+    const phoenix = await withTimeout(PhoenixWrapper.connect(connection, "devnet"), PHOENIX_BOOK_TIMEOUT_MS, "timed out connecting Phoenix");
     await Promise.all(
       linked.map(async (market) => {
         try {
           const top = await withTimeout(
             phoenix.getTopOfBook(new PublicKey(market.phoenixMarket!)),
-            4_000,
+            PHOENIX_BOOK_TIMEOUT_MS,
             "timed out reading Phoenix book"
           );
           market.bestBidCents = top.bestBidPriceInUsdc == null ? null : Math.round(top.bestBidPriceInUsdc * 100);

@@ -1,8 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { solanaExplorerAccountUrl } from "@/lib/explorer";
 import { fetchLiveMarkets } from "@/lib/live-markets";
 import { summarizeMarketsByTicker } from "@/lib/market-stats";
+import { MarketBrowser } from "@/components/MarketBrowser";
 
 export const dynamic = "force-dynamic";
 
@@ -92,69 +92,7 @@ export default async function MarketsPage() {
       </div>
 
       {live.kind === "live" ? (
-        <section className="rounded-lg border border-slate-800 bg-panel p-4">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="text-sm font-medium text-slate-300">Active Markets</h2>
-            <Link href="/status" className="text-xs text-slate-400 hover:text-white">
-              Full status
-            </Link>
-          </div>
-          {activeMarkets.length === 0 ? (
-            <p className="text-sm text-slate-500">No active markets. Run the morning job or demo market script to create the next batch.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="text-xs uppercase text-slate-500">
-                  <tr>
-                    <th className="py-2">Market</th>
-                    <th>Feed</th>
-                    <th>Phoenix</th>
-                    <th>Liquidity</th>
-                    <th>Expiry</th>
-                    <th>Account</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800">
-                  {activeMarkets.map((market) => (
-                    <tr key={market.address}>
-                      <td className="py-2">
-                        <Link href={`/trade/${market.ticker}`} className="text-slate-200 hover:text-white">
-                          {market.ticker} {">"} ${(market.strikeCents / 100).toFixed(0)}
-                        </Link>
-                      </td>
-                      <td>
-                        <Badge tone={market.configuredFeed ? "ok" : "warn"}>
-                          {market.configuredFeed ? "configured" : "demo/fake"}
-                        </Badge>
-                      </td>
-                      <td>
-                        <Badge tone={market.phoenixMarket ? "info" : "muted"}>
-                          {market.phoenixMarket ? "linked" : "none"}
-                        </Badge>
-                      </td>
-                      <td className="text-xs text-slate-400">
-                        {market.bestBidCents !== null || market.bestAskCents !== null
-                          ? `Bid ${formatPrice(market.bestBidCents)} / Ask ${formatPrice(market.bestAskCents)}`
-                          : "empty"}
-                      </td>
-                      <td>{formatTime(market.expiryTs)}</td>
-                      <td>
-                        <a
-                          href={solanaExplorerAccountUrl(market.address)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="font-mono text-xs text-slate-500 hover:text-slate-300"
-                        >
-                          {shortAddress(market.address)}
-                        </a>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+        <MarketBrowser markets={live.markets} />
       ) : null}
 
       {live.kind === "unavailable" ? (
@@ -172,21 +110,4 @@ function Badge({ children, tone }: { children: ReactNode; tone: "ok" | "warn" | 
     muted: "border-slate-700 bg-slate-800/40 text-slate-400",
   };
   return <span className={`rounded border px-2 py-0.5 ${classes[tone]}`}>{children}</span>;
-}
-
-function formatTime(ts: number): string {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(ts * 1000));
-}
-
-function formatPrice(cents: number | null): string {
-  return cents === null ? "-" : `$${(cents / 100).toFixed(2)}`;
-}
-
-function shortAddress(address: string): string {
-  return `${address.slice(0, 4)}...${address.slice(-4)}`;
 }

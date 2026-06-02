@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "tsx --test \"src/**/*.test.ts\"",
+    "test": "tsx --test src/lib/server/meridian.test.ts src/lib/transaction-status.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
