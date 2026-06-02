@@ -1,5 +1,6 @@
 import { fetchLiveMarkets } from "@/lib/live-markets";
 import { summarizeMarkets, summarizeMarketsByTicker } from "@/lib/market-stats";
+import { envValue } from "@/lib/server/env";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,7 @@ export async function GET() {
   return Response.json({
     ok: true,
     generatedAt: new Date().toISOString(),
+    usdcMint: envValue("USDC_MINT") ?? null,
     stats: summarizeMarkets(live.markets, nowSec),
     byTicker: summarizeMarketsByTicker(live.markets, nowSec),
     activeMarkets: active.map((market) => ({
@@ -25,6 +27,8 @@ export async function GET() {
       expiryTs: market.expiryTs,
       configuredFeed: market.configuredFeed,
       phoenixMarket: market.phoenixMarket,
+      bestBidCents: market.bestBidCents,
+      bestAskCents: market.bestAskCents,
     })),
     pendingSettlement: pending.map((market) => ({
       address: market.address,

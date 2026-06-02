@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { fetchLiveMarkets, LiveMarket } from "@/lib/live-markets";
 import { outcomeLabel, summarizeMarkets, summarizeMarketsByTicker } from "@/lib/market-stats";
 import { solanaExplorerAccountUrl } from "@/lib/explorer";
+import { WalletReadiness } from "@/components/WalletReadiness";
 
 export const dynamic = "force-dynamic";
 
@@ -68,6 +69,8 @@ export default async function StatusPage() {
         pendingConfigured={pendingConfigured.length}
         pendingDemo={pendingDemo.length}
       />
+
+      <WalletReadiness />
 
       <section className="rounded-lg border border-slate-800 bg-panel p-4">
         <h2 className="mb-3 text-sm font-medium text-slate-300">By Ticker</h2>
