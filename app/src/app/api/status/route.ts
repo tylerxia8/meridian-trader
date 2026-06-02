@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const live = await fetchLiveMarkets();
   if (live.kind === "unavailable") {
-    return Response.json({ ok: false, reason: live.reason }, { status: 503 });
+    return Response.json({ ok: false, reason: live.reason, usdcMint: envValue("USDC_MINT") ?? null }, { status: 503 });
   }
 
   const nowSec = Math.floor(Date.now() / 1000);

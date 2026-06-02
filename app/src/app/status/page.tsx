@@ -12,9 +12,22 @@ export default async function StatusPage() {
 
   if (live.kind === "unavailable") {
     return (
-      <div className="space-y-3">
-        <h1 className="text-2xl font-semibold">Status</h1>
-        <p className="text-sm text-slate-400">Live status unavailable: {live.reason}.</p>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold">Status</h1>
+          <p className="mt-1 text-sm text-slate-400">Live status unavailable: {live.reason}.</p>
+        </div>
+        <section className="rounded-lg border border-amber-400/30 bg-amber-400/10 p-4">
+          <h2 className="text-sm font-medium text-amber-300">Recovery Cue</h2>
+          <p className="mt-1 text-sm text-slate-300">
+            Check RPC connectivity and generated Anchor artifacts, then rerun the status command from the project root.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <code className="rounded border border-slate-700 bg-slate-950/40 px-3 py-2 text-xs text-slate-300">npm run demo:status</code>
+            <code className="rounded border border-slate-700 bg-slate-950/40 px-3 py-2 text-xs text-slate-300">anchor build</code>
+          </div>
+        </section>
+        <WalletReadiness />
       </div>
     );
   }
