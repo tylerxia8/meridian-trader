@@ -43,7 +43,8 @@ Notes:
   settled markets, skipped fake-feed markets, and Phoenix-linked markets.
 - `npm run trade:demo` creates a fresh Meridian market, creates/links a
   Phoenix book, and seeds small bid/ask liquidity so browser trades have a
-  live order book to hit.
+  live order book to hit. It now preflights the admin keypair, SOL balance,
+  IDL, and demo USDC balance before spending transactions.
 - `npm run tradable:status` lists active Phoenix-linked markets, current
   bid/ask liquidity, supported trade actions, and the trade page to open.
 - `npm run create:markets` skips after 9:30am ET unless

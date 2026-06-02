@@ -9,7 +9,10 @@
 //   TRADE_DEMO_EXPIRY_SECS=86400
 //   TRADE_DEMO_DRY_RUN=true
 import "dotenv/config";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
+import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { spawnSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
 
 async function main(): Promise<void> {
   const ticker = process.env.TRADE_DEMO_TICKER ?? "META";
@@ -33,6 +36,8 @@ async function main(): Promise<void> {
     return;
   }
 
+  await preflight(env);
+
   console.log(`[trade-demo] Creating Meridian market for ${ticker}`);
   const create = run("npm", ["run", "demo:market"], env);
   const market = parseMarket(create.stdout);
@@ -49,6 +54,50 @@ async function main(): Promise<void> {
   console.log("[trade-demo] Open /markets or /trade/" + ticker);
 }
 
+async function preflight(env: NodeJS.ProcessEnv): Promise<void> {
+  const rpcUrl = requiredEnv(env, "SOLANA_RPC_URL");
+  requiredEnv(env, "MERIDIAN_PROGRAM_ID");
+  const walletPath = requiredEnv(env, "ANCHOR_WALLET");
+  const usdcMint = new PublicKey(requiredEnv(env, "USDC_MINT"));
+  if (!existsSync("target/idl/meridian.json")) {
+    throw new Error("Missing target/idl/meridian.json; run anchor build before trade:demo.");
+  }
+  if (!existsSync(walletPath)) {
+    throw new Error(`ANCHOR_WALLET file not found: ${walletPath}`);
+  }
+
+  const admin = Keypair.fromSecretKey(readKeypairBytes(walletPath));
+  const connection = new Connection(rpcUrl, "confirmed");
+  const minSol = envNumber(env, "TRADE_DEMO_MIN_SOL", 0.25);
+  const solBalance = (await connection.getBalance(admin.publicKey, "confirmed")) / 1_000_000_000;
+  if (solBalance < minSol) {
+    throw new Error(
+      `Admin wallet has ${solBalance.toFixed(3)} SOL; trade:demo expects at least ${minSol} SOL for Phoenix setup.`
+    );
+  }
+
+  const userUsdc = getAssociatedTokenAddressSync(usdcMint, admin.publicKey);
+  const requiredUsdc = BigInt(Math.ceil(envNumber(env, "PHOENIX_SMOKE_USDC_UNITS", 1) * 1_000_000));
+  const usdcBalance = await tokenBalance(connection, userUsdc);
+  if (usdcBalance < requiredUsdc) {
+    throw new Error(
+      `Admin USDC ATA ${userUsdc.toBase58()} has ${usdcBalance} raw units; needs ${requiredUsdc}. Fund demo USDC before trade:demo.`
+    );
+  }
+
+  console.log(`[trade-demo] Preflight passed for admin ${admin.publicKey.toBase58()}`);
+  console.log(`[trade-demo] Admin balance: ${solBalance.toFixed(3)} SOL, ${usdcBalance} raw demo USDC`);
+}
+
+async function tokenBalance(connection: Connection, ata: PublicKey): Promise<bigint> {
+  try {
+    const result = await connection.getTokenAccountBalance(ata, "confirmed");
+    return BigInt(result.value.amount);
+  } catch {
+    return 0n;
+  }
+}
+
 function run(command: string, args: string[], env: NodeJS.ProcessEnv): { stdout: string; stderr: string } {
   const result = spawnSync(command, args, {
     env,
@@ -61,6 +110,24 @@ function run(command: string, args: string[], env: NodeJS.ProcessEnv): { stdout:
     throw new Error(`${command} ${args.join(" ")} failed with exit code ${result.status ?? "unknown"}`);
   }
   return { stdout: result.stdout ?? "", stderr: result.stderr ?? "" };
+}
+
+function requiredEnv(env: NodeJS.ProcessEnv, key: string): string {
+  const value = env[key];
+  if (!value) throw new Error(`Missing required env var: ${key}`);
+  return value;
+}
+
+function envNumber(env: NodeJS.ProcessEnv, key: string, fallback: number): number {
+  const value = env[key];
+  if (!value) return fallback;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) throw new Error(`Invalid positive numeric env var ${key}: ${value}`);
+  return parsed;
+}
+
+function readKeypairBytes(path: string): Uint8Array {
+  return Uint8Array.from(JSON.parse(readFileSync(path, "utf8")));
 }
 
 function parseMarket(output: string): string {
