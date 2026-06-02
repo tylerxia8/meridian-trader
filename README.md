@@ -134,6 +134,7 @@ Copy the `meridian` program ID into both `MERIDIAN_PROGRAM_ID` and `NEXT_PUBLIC_
 # Readiness and smoke lifecycle
 npm run lifecycle:demo
 npm run demo:status
+npm run tradable:status
 
 # Create daily configured-feed markets
 npm run create:markets

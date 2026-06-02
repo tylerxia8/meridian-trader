@@ -77,14 +77,18 @@ export async function POST(request: Request) {
     await ensurePhoenixSeat({ connection, phoenixMarket, trader: user });
 
     const ctx = { meridian, phoenix, user, market: marketKeys, phoenixMarket };
-    const tradeIxs =
-      body.action === "buyYes"
-        ? await buildBuyYesIx(ctx, sizeAtoms)
-        : body.action === "sellYes"
-          ? await buildSellYesIx(ctx, sizeAtoms)
-          : body.action === "buyNo"
-            ? await buildBuyNoIxs(ctx, sizeAtoms, (body.yesPriceCents ?? 50) / 100)
-            : await buildSellNoIxs(ctx, sizeAtoms, { unwindWithRedeemPair: true });
+    let tradeIxs;
+    if (body.action === "buyYes") {
+      tradeIxs = await buildBuyYesIx(ctx, sizeAtoms);
+    } else if (body.action === "sellYes") {
+      tradeIxs = await buildSellYesIx(ctx, sizeAtoms);
+    } else if (body.action === "buyNo") {
+      // Buy No mints a pair, then sells YES into the bid. The IOC limit
+      // must be the live bid, not the UI midpoint/ask display price.
+      tradeIxs = await buildBuyNoIxs(ctx, sizeAtoms, topOfBook.bestBidPriceInUsdc!);
+    } else {
+      tradeIxs = await buildSellNoIxs(ctx, sizeAtoms, { unwindWithRedeemPair: true });
+    }
 
     const tx = new Transaction();
     tx.add(...meridian.ataIxs(marketKeys, user, user), ...tradeIxs);
