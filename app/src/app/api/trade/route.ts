@@ -24,6 +24,9 @@ export async function POST(request: Request) {
     if (!body.action || !body.marketAddress || !body.phoenixMarket || !body.user || !body.sizeContracts) {
       return Response.json({ error: "Missing trade request fields" }, { status: 400 });
     }
+    if (!isTradeAction(body.action)) {
+      return Response.json({ error: "Unsupported trade action" }, { status: 400 });
+    }
 
     const rpcUrl = envValue("NEXT_PUBLIC_SOLANA_RPC_URL", "SOLANA_RPC_URL") ?? "https://api.devnet.solana.com";
     const programId = envValue("NEXT_PUBLIC_MERIDIAN_PROGRAM_ID", "MERIDIAN_PROGRAM_ID");
@@ -57,6 +60,13 @@ export async function POST(request: Request) {
     };
     const user = new PublicKey(body.user);
     const phoenixMarket = new PublicKey(body.phoenixMarket);
+    const linkedPhoenixMarket = marketAccount.phoenixMarket as PublicKey;
+    if (!linkedPhoenixMarket || linkedPhoenixMarket.equals(PublicKey.default)) {
+      return Response.json({ error: "Market is not linked to a Phoenix book" }, { status: 400 });
+    }
+    if (!linkedPhoenixMarket.equals(phoenixMarket)) {
+      return Response.json({ error: "Phoenix market does not match the selected Meridian market" }, { status: 400 });
+    }
     const meridian = new MeridianClient({
       provider,
       program,
@@ -101,6 +111,10 @@ export async function POST(request: Request) {
   } catch (err: any) {
     return Response.json({ error: err?.message ?? String(err) }, { status: 500 });
   }
+}
+
+function isTradeAction(value: string): value is TradeAction {
+  return value === "buyYes" || value === "sellYes" || value === "buyNo" || value === "sellNo";
 }
 
 function outcomeName(outcome: any): "unsettled" | "yesWins" | "noWins" {
