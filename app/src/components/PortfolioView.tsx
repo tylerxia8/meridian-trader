@@ -5,6 +5,7 @@ import { Connection, PublicKey, Transaction } from "@solana/web3.js";
 import { useEffect, useMemo, useState } from "react";
 import type { LiveMarket } from "@/lib/live-markets";
 import { outcomeLabel } from "@/lib/market-stats";
+import { solanaExplorerAccountUrl } from "@/lib/explorer";
 
 type PositionRow = {
   market: LiveMarket;
@@ -17,6 +18,7 @@ export function PortfolioView({ markets }: { markets: LiveMarket[] }) {
   const { connection } = useConnection();
   const [rows, setRows] = useState<PositionRow[]>([]);
   const [status, setStatus] = useState<string | null>(null);
+  const [refreshNonce, setRefreshNonce] = useState(0);
   const visibleMarkets = useMemo(() => markets.filter((market) => market.configuredFeed), [markets]);
 
   useEffect(() => {
@@ -54,7 +56,7 @@ export function PortfolioView({ markets }: { markets: LiveMarket[] }) {
     return () => {
       cancelled = true;
     };
-  }, [connection, publicKey, visibleMarkets]);
+  }, [connection, publicKey, refreshNonce, visibleMarkets]);
 
   if (!connected) {
     return (
@@ -107,6 +109,10 @@ export function PortfolioView({ markets }: { markets: LiveMarket[] }) {
                       publicKey={publicKey}
                       sendTransaction={sendTransaction}
                       connection={connection}
+                      onSubmitted={() => {
+                        setRefreshNonce((nonce) => nonce + 1);
+                        window.setTimeout(() => setRefreshNonce((nonce) => nonce + 1), 2500);
+                      }}
                     />
                   </td>
                 </tr>
@@ -124,11 +130,13 @@ function RedeemCell({
   publicKey,
   sendTransaction,
   connection,
+  onSubmitted,
 }: {
   row: PositionRow;
   publicKey: PublicKey | null;
   sendTransaction: (tx: Transaction, connection: Connection) => Promise<string>;
   connection: Connection;
+  onSubmitted: () => void;
 }) {
   const [status, setStatus] = useState<string | null>(null);
   const redeem = redeemable(row);
@@ -154,7 +162,8 @@ function RedeemCell({
             const payload = (await response.json()) as { transaction?: string; error?: string };
             if (!response.ok || !payload.transaction) throw new Error(payload.error ?? "Redeem transaction build failed");
             const signature = await sendTransaction(Transaction.from(base64ToBytes(payload.transaction)), connection);
-            setStatus(`Submitted ${signature.slice(0, 8)}...${signature.slice(-8)}`);
+            setStatus(`Submitted ${signature}`);
+            onSubmitted();
           } catch (err: any) {
             setStatus(err?.message ?? "Redeem failed");
           }
@@ -162,8 +171,31 @@ function RedeemCell({
       >
         Redeem {formatContracts(redeem.amount)}
       </button>
-      {status ? <span className="text-xs text-slate-500">{status}</span> : null}
+      {status ? <RedeemStatus status={status} /> : null}
     </div>
+  );
+}
+
+function RedeemStatus({ status }: { status: string }) {
+  const signature = status.match(/[1-9A-HJ-NP-Za-km-z]{32,88}/)?.[0];
+  const label = signature ? status.replace(signature, `${signature.slice(0, 8)}...${signature.slice(-8)}`) : status;
+  return (
+    <span className="text-xs text-slate-500">
+      {label}
+      {signature ? (
+        <>
+          {" "}
+          <a
+            href={solanaExplorerAccountUrl(signature, "tx")}
+            target="_blank"
+            rel="noreferrer"
+            className="text-slate-300 hover:text-white"
+          >
+            Explorer
+          </a>
+        </>
+      ) : null}
+    </span>
   );
 }
 

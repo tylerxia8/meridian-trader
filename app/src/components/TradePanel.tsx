@@ -4,6 +4,7 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { Transaction } from "@solana/web3.js";
 import { AllowedAction, UserBalances } from "@/lib/positions-client";
 import { outcomeLabel } from "@/lib/market-stats";
+import { solanaExplorerAccountUrl } from "@/lib/explorer";
 
 interface Props {
   ticker: string;
@@ -19,6 +20,7 @@ interface Props {
   balanceStatus: string | null;
   allowed: AllowedAction[];
   guidance: string | null;
+  onSubmitted?: () => void;
 }
 
 export function TradePanel({
@@ -35,6 +37,7 @@ export function TradePanel({
   balanceStatus,
   allowed,
   guidance,
+  onSubmitted,
 }: Props) {
   const [size, setSize] = useState("1");
   const [status, setStatus] = useState<string | null>(null);
@@ -92,7 +95,8 @@ export function TradePanel({
       if (!response.ok || !payload.transaction) throw new Error(payload.error ?? "Trade transaction build failed");
       const tx = Transaction.from(base64ToBytes(payload.transaction));
       const signature = await sendTransaction(tx, connection);
-      setStatus(`${labelFor(action)} submitted: ${signature.slice(0, 8)}...${signature.slice(-8)}`);
+      setStatus(`${labelFor(action)} submitted: ${signature}`);
+      onSubmitted?.();
     } catch (err: any) {
       setStatus(err?.message ?? "Trade submission failed");
     }
@@ -112,7 +116,7 @@ export function TradePanel({
       });
       const payload = (await response.json()) as { signature?: string | null; error?: string };
       if (!response.ok) throw new Error(payload.error ?? "Phoenix seat setup failed");
-      setStatus(payload.signature ? `Phoenix seat ready: ${payload.signature.slice(0, 8)}...${payload.signature.slice(-8)}` : "Phoenix seat already ready");
+      setStatus(payload.signature ? `Phoenix seat ready: ${payload.signature}` : "Phoenix seat already ready");
     } catch (err: any) {
       setStatus(err?.message ?? "Phoenix seat setup failed");
     }
@@ -197,13 +201,36 @@ export function TradePanel({
         />
       </div>
 
-      {status ? <p className="text-xs text-amber-300">{status}</p> : null}
+      {status ? <StatusLine status={status} /> : null}
 
       <p className="border-t border-slate-800 pt-3 text-xs text-slate-500">
         You pay ${(yesPriceCents / 100).toFixed(2)} per contract. You win $1.00 if {ticker} closes
         at or above ${(strikeCents / 100).toFixed(0)} at 4:00 PM ET.
       </p>
     </div>
+  );
+}
+
+function StatusLine({ status }: { status: string }) {
+  const signature = status.match(/[1-9A-HJ-NP-Za-km-z]{32,88}/)?.[0];
+  const label = signature ? status.replace(signature, `${signature.slice(0, 8)}...${signature.slice(-8)}`) : status;
+  return (
+    <p className="text-xs text-amber-300">
+      {label}
+      {signature ? (
+        <>
+          {" "}
+          <a
+            href={solanaExplorerAccountUrl(signature, "tx")}
+            target="_blank"
+            rel="noreferrer"
+            className="text-slate-300 hover:text-white"
+          >
+            Explorer
+          </a>
+        </>
+      ) : null}
+    </p>
   );
 }
 

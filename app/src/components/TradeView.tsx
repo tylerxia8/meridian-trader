@@ -77,6 +77,7 @@ export function TradeView({
   const { connection } = useConnection();
   const [balances, setBalances] = useState<UserBalances>({ yes: 0n, no: 0n });
   const [balanceStatus, setBalanceStatus] = useState<string | null>(null);
+  const [balanceRefreshNonce, setBalanceRefreshNonce] = useState(0);
   const { allowed, guidance } = allowedActions(balances);
 
   useEffect(() => {
@@ -122,7 +123,7 @@ export function TradeView({
     return () => {
       cancelled = true;
     };
-  }, [connection, selected.noMint, selected.yesMint, wallet.publicKey]);
+  }, [balanceRefreshNonce, connection, selected.noMint, selected.yesMint, wallet.publicKey]);
 
   return (
     <div className="space-y-6">
@@ -217,6 +218,10 @@ export function TradeView({
             balanceStatus={balanceStatus}
             allowed={allowed}
             guidance={guidance}
+            onSubmitted={() => {
+              setBalanceRefreshNonce((nonce) => nonce + 1);
+              window.setTimeout(() => setBalanceRefreshNonce((nonce) => nonce + 1), 2500);
+            }}
           />
         </aside>
       </div>
