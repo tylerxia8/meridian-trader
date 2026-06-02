@@ -2,7 +2,7 @@
 
 A non-custodial Solana dApp for trading binary outcome contracts on the daily closing prices of MAG7 US equities: AAPL, MSFT, GOOGL, AMZN, NVDA, META, and TSLA. Each contract asks: "Will [STOCK] close at or above [PRICE] today?" YES pays $1 USDC if true; NO pays $1 USDC if false. Contracts expire same-day and settle from Pyth equity feeds. YES tokens trade against USDC on Phoenix CLOB, while the UI maps YES/NO actions onto one book.
 
-**Status:** compile-clean frontend and automation, deployed devnet Meridian program, working lifecycle demo, Pyth settlement path, delayed admin fallback, Phoenix market creation/linking, two-sided Phoenix liquidity seeding, wallet portfolio/history views, and browser transaction builders for trade/redeem.
+**Status:** compile-clean frontend and automation, deployed devnet Meridian program, working lifecycle demo, Pyth settlement path, delayed admin fallback, Phoenix market creation/linking, two-sided Phoenix liquidity seeding, wallet portfolio/history views, confirmed browser transaction builders for trade/redeem, and bulk portfolio redemption.
 
 ## Architecture
 
@@ -165,6 +165,9 @@ Notes:
 - `create:markets` skips after 9:30am ET unless `MORNING_ALLOW_AFTER_OPEN=true` is set.
 - `trade:demo` spends devnet SOL because it creates a Phoenix market and seeds liquidity.
 - Browser trading requires an active Phoenix-linked market with live bid/ask liquidity. Empty books intentionally disable market-order buttons.
+- The Markets page has filters for active, tradable, real-feed, demo, expired, settled, and all markets.
+- Trade and redeem flows show submitted signatures, wait for devnet confirmation, then refresh balances.
+- The Portfolio page can redeem all currently redeemable positions in sequence.
 - The app can prepare a connected wallet's Phoenix seat through `/api/phoenix-seat`, using the configured devnet admin authority.
 
 ## Frontend

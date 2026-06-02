@@ -102,9 +102,15 @@ http://localhost:3000/markets
 http://localhost:3000/trade/META
 ```
 
+The Markets page includes filters for active, tradable, real-feed, demo,
+expired, settled, and all markets. The Status page keeps wallet readiness and
+recovery guidance visible even when live market reads are unavailable.
+
 The trade screen currently shows live markets, linked Phoenix status, the
 connected wallet's YES/NO token balances, Explorer links, and a read-only
 transaction route preview. For Phoenix-linked active markets, the action
 buttons request an unsigned transaction from `/api/trade`; the connected
-browser wallet signs and submits it. The script-based demo path remains useful
-when a devnet browser wallet is unavailable.
+browser wallet signs, submits, waits for devnet confirmation, and refreshes
+balances. The Portfolio page supports single-position redemption and sequential
+bulk redemption for all currently redeemable positions. The script-based demo
+path remains useful when a devnet browser wallet is unavailable.
