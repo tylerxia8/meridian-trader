@@ -63,9 +63,9 @@ export function linkedPhoenixMarketError(marketAccount: any, phoenixMarket: Publ
   return null;
 }
 
-export function activeMarketError(marketAccount: any): string | null {
+export function activeMarketError(marketAccount: any, nowSec = Math.floor(Date.now() / 1000)): string | null {
   if (outcomeName(marketAccount.outcome) !== "unsettled") return "Market is already settled";
-  if (Number(marketAccount.expiryTs) <= Math.floor(Date.now() / 1000)) {
+  if (Number(marketAccount.expiryTs) <= nowSec) {
     return "Market is expired and waiting for settlement";
   }
   return null;

@@ -19,6 +19,7 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test --workspace=automation
+      - run: npm test --workspace=app
       - run: npm run build --workspace=app
 
   anchor-build-test:
