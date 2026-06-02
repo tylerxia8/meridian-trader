@@ -5,6 +5,7 @@ import { Transaction } from "@solana/web3.js";
 import { AllowedAction, UserBalances } from "@/lib/positions-client";
 import { outcomeLabel } from "@/lib/market-stats";
 import { solanaExplorerAccountUrl } from "@/lib/explorer";
+import { shortSignature, waitForSignatureConfirmation } from "@/lib/transaction-status";
 
 interface Props {
   ticker: string;
@@ -41,6 +42,8 @@ export function TradePanel({
 }: Props) {
   const [size, setSize] = useState("1");
   const [status, setStatus] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState<AllowedAction | null>(null);
+  const [preparingSeat, setPreparingSeat] = useState(false);
   const { connected, publicKey, sendTransaction } = useWallet();
   const { connection } = useConnection();
   const noPriceCents = 100 - yesPriceCents;
@@ -77,6 +80,8 @@ export function TradePanel({
       setStatus("Enter a positive contract size.");
       return;
     }
+    if (submitting || preparingSeat) return;
+    setSubmitting(action);
     setStatus(`Preparing ${labelFor(action)} transaction`);
     try {
       const response = await fetch("/api/trade", {
@@ -95,10 +100,19 @@ export function TradePanel({
       if (!response.ok || !payload.transaction) throw new Error(payload.error ?? "Trade transaction build failed");
       const tx = Transaction.from(base64ToBytes(payload.transaction));
       const signature = await sendTransaction(tx, connection);
-      setStatus(`${labelFor(action)} submitted: ${signature}`);
+      setStatus(`${labelFor(action)} submitted: ${signature}. Confirming on devnet`);
+      onSubmitted?.();
+      const confirmation = await waitForSignatureConfirmation(connection, signature);
+      setStatus(
+        confirmation === "timeout"
+          ? `${labelFor(action)} submitted: ${signature}. Still awaiting confirmation`
+          : `${labelFor(action)} confirmed: ${signature}`
+      );
       onSubmitted?.();
     } catch (err: any) {
       setStatus(err?.message ?? "Trade submission failed");
+    } finally {
+      setSubmitting(null);
     }
   }
 
@@ -107,6 +121,8 @@ export function TradePanel({
       setStatus("Connect a wallet and select a Phoenix-linked market first.");
       return;
     }
+    if (submitting || preparingSeat) return;
+    setPreparingSeat(true);
     setStatus("Preparing Phoenix seat");
     try {
       const response = await fetch("/api/phoenix-seat", {
@@ -119,6 +135,8 @@ export function TradePanel({
       setStatus(payload.signature ? `Phoenix seat ready: ${payload.signature}` : "Phoenix seat already ready");
     } catch (err: any) {
       setStatus(err?.message ?? "Phoenix seat setup failed");
+    } finally {
+      setPreparingSeat(false);
     }
   }
 
@@ -166,9 +184,10 @@ export function TradePanel({
         <button
           type="button"
           onClick={prepareSeat}
+          disabled={preparingSeat || Boolean(submitting)}
           className="w-full rounded border border-slate-700 px-3 py-2 text-xs text-slate-300 transition hover:border-slate-500"
         >
-          Prepare Phoenix seat
+          {preparingSeat ? "Preparing Phoenix seat" : "Prepare Phoenix seat"}
         </button>
       ) : null}
 
@@ -176,27 +195,27 @@ export function TradePanel({
         <ActionButton
           label="Buy Yes"
           color="yes"
-          enabled={connected && hasAsk && !unavailableReason && !guidance && allowed.includes("buyYes")}
+          enabled={connected && hasAsk && !unavailableReason && !guidance && allowed.includes("buyYes") && !submitting && !preparingSeat}
           onClick={() => handleClick("buyYes")}
         />
         <ActionButton
           label="Sell Yes"
           color="yes"
           variant="outline"
-          enabled={connected && hasBid && !unavailableReason && !guidance && allowed.includes("sellYes")}
+          enabled={connected && hasBid && !unavailableReason && !guidance && allowed.includes("sellYes") && !submitting && !preparingSeat}
           onClick={() => handleClick("sellYes")}
         />
         <ActionButton
           label="Buy No"
           color="no"
-          enabled={connected && hasBid && !unavailableReason && !guidance && allowed.includes("buyNo")}
+          enabled={connected && hasBid && !unavailableReason && !guidance && allowed.includes("buyNo") && !submitting && !preparingSeat}
           onClick={() => handleClick("buyNo")}
         />
         <ActionButton
           label="Sell No"
           color="no"
           variant="outline"
-          enabled={connected && hasAsk && !unavailableReason && !guidance && allowed.includes("sellNo")}
+          enabled={connected && hasAsk && !unavailableReason && !guidance && allowed.includes("sellNo") && !submitting && !preparingSeat}
           onClick={() => handleClick("sellNo")}
         />
       </div>
@@ -213,7 +232,7 @@ export function TradePanel({
 
 function StatusLine({ status }: { status: string }) {
   const signature = status.match(/[1-9A-HJ-NP-Za-km-z]{32,88}/)?.[0];
-  const label = signature ? status.replace(signature, `${signature.slice(0, 8)}...${signature.slice(-8)}`) : status;
+  const label = signature ? status.replace(signature, shortSignature(signature)) : status;
   return (
     <p className="text-xs text-amber-300">
       {label}

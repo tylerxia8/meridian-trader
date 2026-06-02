@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { LiveMarket } from "@/lib/live-markets";
 import { outcomeLabel } from "@/lib/market-stats";
 import { solanaExplorerAccountUrl } from "@/lib/explorer";
+import { shortSignature, waitForSignatureConfirmation } from "@/lib/transaction-status";
 
 type PositionRow = {
   market: LiveMarket;
@@ -139,14 +140,17 @@ function RedeemCell({
   onSubmitted: () => void;
 }) {
   const [status, setStatus] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const redeem = redeemable(row);
   if (!redeem) return <span>-</span>;
   return (
     <div className="flex flex-col gap-1">
       <button
         className="w-fit rounded border border-yes/60 px-2 py-1 text-xs text-yes hover:bg-yes/10"
+        disabled={submitting}
         onClick={async () => {
-          if (!publicKey) return;
+          if (!publicKey || submitting) return;
+          setSubmitting(true);
           setStatus("Preparing redeem");
           try {
             const response = await fetch("/api/redeem", {
@@ -162,14 +166,23 @@ function RedeemCell({
             const payload = (await response.json()) as { transaction?: string; error?: string };
             if (!response.ok || !payload.transaction) throw new Error(payload.error ?? "Redeem transaction build failed");
             const signature = await sendTransaction(Transaction.from(base64ToBytes(payload.transaction)), connection);
-            setStatus(`Submitted ${signature}`);
+            setStatus(`Submitted ${signature}. Confirming on devnet`);
+            onSubmitted();
+            const confirmation = await waitForSignatureConfirmation(connection, signature);
+            setStatus(
+              confirmation === "timeout"
+                ? `Submitted ${signature}. Still awaiting confirmation`
+                : `Confirmed ${signature}`
+            );
             onSubmitted();
           } catch (err: any) {
             setStatus(err?.message ?? "Redeem failed");
+          } finally {
+            setSubmitting(false);
           }
         }}
       >
-        Redeem {formatContracts(redeem.amount)}
+        {submitting ? "Redeeming" : `Redeem ${formatContracts(redeem.amount)}`}
       </button>
       {status ? <RedeemStatus status={status} /> : null}
     </div>
@@ -178,7 +191,7 @@ function RedeemCell({
 
 function RedeemStatus({ status }: { status: string }) {
   const signature = status.match(/[1-9A-HJ-NP-Za-km-z]{32,88}/)?.[0];
-  const label = signature ? status.replace(signature, `${signature.slice(0, 8)}...${signature.slice(-8)}`) : status;
+  const label = signature ? status.replace(signature, shortSignature(signature)) : status;
   return (
     <span className="text-xs text-slate-500">
       {label}
