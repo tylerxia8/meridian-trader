@@ -18,6 +18,12 @@ export async function POST(request: Request) {
     if (!body.kind || !body.marketAddress || !body.user || !body.amountAtoms) {
       return Response.json({ error: "Missing redeem request fields" }, { status: 400 });
     }
+    if (!isRedeemKind(body.kind)) {
+      return Response.json({ error: "Unsupported redeem kind" }, { status: 400 });
+    }
+    if (!/^[1-9]\d*$/.test(body.amountAtoms)) {
+      return Response.json({ error: "Amount must be a positive integer atom value" }, { status: 400 });
+    }
 
     const rpcUrl = envValue("NEXT_PUBLIC_SOLANA_RPC_URL", "SOLANA_RPC_URL") ?? "https://api.devnet.solana.com";
     const programId = envValue("NEXT_PUBLIC_MERIDIAN_PROGRAM_ID", "MERIDIAN_PROGRAM_ID");
@@ -38,6 +44,13 @@ export async function POST(request: Request) {
     const config = await (program.account as any).config.fetch(configKey);
     const marketAddress = new PublicKey(body.marketAddress);
     const marketAccount = await (program.account as any).market.fetch(marketAddress);
+    const outcome = outcomeName(marketAccount.outcome);
+    if (body.kind === "yes" && outcome !== "yesWins") {
+      return Response.json({ error: "YES tokens are only redeemable after YES wins" }, { status: 400 });
+    }
+    if (body.kind === "no" && outcome !== "noWins") {
+      return Response.json({ error: "NO tokens are only redeemable after NO wins" }, { status: 400 });
+    }
     const marketKeys: MarketKeys = {
       market: marketAddress,
       yesMint: marketAccount.yesMint as PublicKey,
@@ -47,7 +60,6 @@ export async function POST(request: Request) {
     const user = new PublicKey(body.user);
     const meridian = new MeridianClient({ provider, program, usdcMint: config.usdcMint as PublicKey });
     const amount = new BN(body.amountAtoms);
-    if (amount.lten(0)) return Response.json({ error: "Amount must be greater than zero" }, { status: 400 });
 
     const redeemIx =
       body.kind === "pair"
@@ -67,6 +79,17 @@ export async function POST(request: Request) {
   } catch (err: any) {
     return Response.json({ error: err?.message ?? String(err) }, { status: 500 });
   }
+}
+
+function isRedeemKind(value: string): value is RedeemKind {
+  return value === "pair" || value === "yes" || value === "no";
+}
+
+function outcomeName(outcome: any): "unsettled" | "yesWins" | "noWins" {
+  if (!outcome || typeof outcome !== "object") return "unsettled";
+  if ("yesWins" in outcome) return "yesWins";
+  if ("noWins" in outcome) return "noWins";
+  return "unsettled";
 }
 
 function findIdlPath(): string {
