@@ -51,6 +51,9 @@ This calls `scripts/run-local-anchor-test.sh`, which:
 - Runs `anchor test --provider.cluster localnet --validator legacy` against
   `solana-test-validator`, avoiding devnet deploys, RPC rate limits, and an
   extra Surfpool install.
+- The local validator config intentionally avoids devnet clones. The Anchor
+  integration tests create their own test USDC mint, so cloning devnet USDC
+  only adds an RPC failure mode.
 - Restores the committed devnet program id in `Anchor.toml` and `lib.rs` on exit.
 
 Remaining work:
