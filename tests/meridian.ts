@@ -3,7 +3,7 @@ import { Program, BN } from "@coral-xyz/anchor";
 import {
   TOKEN_PROGRAM_ID,
   createMint,
-  createAssociatedTokenAccount,
+  getOrCreateAssociatedTokenAccount,
   mintTo,
   getAccount,
   getMint,
@@ -56,6 +56,14 @@ function vaultPda(programId: PublicKey, market: PublicKey): [PublicKey, number] 
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+async function getOrCreateAta(connection: anchor.web3.Connection, payer: Keypair, mint: PublicKey, owner: PublicKey) {
+  return (
+    await getOrCreateAssociatedTokenAccount(connection, payer, mint, owner, false, "confirmed", {
+      commitment: "confirmed",
+    })
+  ).address;
 }
 
 // Fake 32-byte Pyth feed id for tests (the on-chain side only uses it at settle_market;
@@ -193,9 +201,9 @@ describe("meridian", () => {
         .signers([admin])
         .rpc();
 
-      userUsdc = await createAssociatedTokenAccount(connection, user, usdcMint, user.publicKey);
-      userYes = await createAssociatedTokenAccount(connection, user, yesMint, user.publicKey);
-      userNo = await createAssociatedTokenAccount(connection, user, noMint, user.publicKey);
+      userUsdc = await getOrCreateAta(connection, user, usdcMint, user.publicKey);
+      userYes = await getOrCreateAta(connection, user, yesMint, user.publicKey);
+      userNo = await getOrCreateAta(connection, user, noMint, user.publicKey);
       await mintTo(connection, admin, usdcMint, userUsdc, admin, 100n * ONE_USDC);
     });
 
@@ -436,7 +444,7 @@ describe("meridian", () => {
 
     it("admin_settle: above-strike → YesWins", async () => {
       const ctx = await setupShortLivedMarket("TSLA", 25_000n);
-      await sleep(4500);
+      await sleep(7000);
       await program.methods
         .adminSettle(new BN(26_000)) // $260 > $250 strike
         .accounts({ admin: admin.publicKey, config: configKey, market: ctx.market })
@@ -451,7 +459,7 @@ describe("meridian", () => {
 
     it("admin_settle: at-strike → YesWins (per the 'at or above' rule)", async () => {
       const ctx = await setupShortLivedMarket("AAPL", 23_000n);
-      await sleep(4500);
+      await sleep(7000);
       await program.methods
         .adminSettle(new BN(23_000))
         .accounts({ admin: admin.publicKey, config: configKey, market: ctx.market })
@@ -464,7 +472,7 @@ describe("meridian", () => {
 
     it("admin_settle: below-strike → NoWins", async () => {
       const ctx = await setupShortLivedMarket("MSFT", 42_000n);
-      await sleep(4500);
+      await sleep(7000);
       await program.methods
         .adminSettle(new BN(41_999))
         .accounts({ admin: admin.publicKey, config: configKey, market: ctx.market })
@@ -477,7 +485,7 @@ describe("meridian", () => {
 
     it("admin_settle: before override delay → AdminOverrideTooEarly", async () => {
       const ctx = await setupShortLivedMarket("GOOGL", 12_000n);
-      await sleep(4500);
+      await sleep(7000);
       try {
         await program.methods
           .adminSettle(new BN(0))
@@ -507,7 +515,7 @@ describe("meridian", () => {
 
     it("admin_settle: re-settling already-settled market fails", async () => {
       const ctx = await setupShortLivedMarket("NVDA", 100_000n);
-      await sleep(4500);
+      await sleep(7000);
       await program.methods
         .adminSettle(new BN(101_000))
         .accounts({ admin: admin.publicKey, config: configKey, market: ctx.market })
@@ -568,12 +576,12 @@ describe("meridian", () => {
         .signers([admin])
         .rpc();
 
-      userUsdc = await createAssociatedTokenAccount(connection, user, usdcMint, user.publicKey);
-      userYes = await createAssociatedTokenAccount(connection, user, yesMint, user.publicKey);
-      userNo = await createAssociatedTokenAccount(connection, user, noMint, user.publicKey);
-      settlerUsdc = await createAssociatedTokenAccount(connection, settler, usdcMint, settler.publicKey);
-      settlerYes = await createAssociatedTokenAccount(connection, settler, yesMint, settler.publicKey);
-      settlerNo = await createAssociatedTokenAccount(connection, settler, noMint, settler.publicKey);
+      userUsdc = await getOrCreateAta(connection, user, usdcMint, user.publicKey);
+      userYes = await getOrCreateAta(connection, user, yesMint, user.publicKey);
+      userNo = await getOrCreateAta(connection, user, noMint, user.publicKey);
+      settlerUsdc = await getOrCreateAta(connection, settler, usdcMint, settler.publicKey);
+      settlerYes = await getOrCreateAta(connection, settler, yesMint, settler.publicKey);
+      settlerNo = await getOrCreateAta(connection, settler, noMint, settler.publicKey);
       await mintTo(connection, admin, usdcMint, userUsdc, admin, 10n * ONE_USDC);
       await mintTo(connection, admin, usdcMint, settlerUsdc, admin, 10n * ONE_USDC);
 
@@ -600,7 +608,7 @@ describe("meridian", () => {
           .rpc();
       }
 
-      await sleep(4500);
+      await sleep(7000);
       // Settle YesWins ($155 > $150 strike)
       await program.methods
         .adminSettle(new BN(15_500))
@@ -702,3 +710,4 @@ describe("meridian", () => {
     });
   });
 });
+
