@@ -2,8 +2,8 @@ import * as anchor from "@coral-xyz/anchor";
 import { Program, BN } from "@coral-xyz/anchor";
 import {
   TOKEN_PROGRAM_ID,
+  createAssociatedTokenAccountIdempotent,
   createMint,
-  getOrCreateAssociatedTokenAccount,
   mintTo,
   getAccount,
   getMint,
@@ -59,9 +59,10 @@ function sleep(ms: number): Promise<void> {
 }
 
 async function getOrCreateAta(connection: anchor.web3.Connection, payer: Keypair, mint: PublicKey, owner: PublicKey) {
-  return (
-    await getOrCreateAssociatedTokenAccount(connection, payer, mint, owner, false, "confirmed")
-  ).address;
+  return createAssociatedTokenAccountIdempotent(connection, payer, mint, owner, {
+    commitment: "confirmed",
+    preflightCommitment: "confirmed",
+  });
 }
 
 // Fake 32-byte Pyth feed id for tests (the on-chain side only uses it at settle_market;
