@@ -281,6 +281,30 @@ describe("meridian", () => {
       expect(vAfter).to.eq(ns);
     });
 
+    it("mint_pair rejects swapped user token accounts", async () => {
+      try {
+        await program.methods
+          .mintPair(new BN(ONE_USDC))
+          .accounts({
+            user: user.publicKey,
+            config: configKey,
+            market,
+            yesMint,
+            noMint,
+            vault,
+            userUsdc,
+            userYes: userNo,
+            userNo: userYes,
+            tokenProgram: TOKEN_PROGRAM_ID,
+          })
+          .signers([user])
+          .rpc();
+        expect.fail();
+      } catch (e: any) {
+        expect(e.toString()).to.match(/Constraint|constraint/i);
+      }
+    });
+
     it("property: random mint/redeem sequence preserves vault == yes_supply == no_supply", async () => {
       const rand = (max: number) => Math.floor(Math.random() * max);
       let userPairs = (await getAccount(connection, userYes)).amount;
@@ -637,6 +661,28 @@ describe("meridian", () => {
 
       const uAfter = (await getAccount(connection, userUsdc)).amount;
       expect(uAfter - uBefore).to.eq(2n * ONE_USDC);
+    });
+
+    it("redeem_yes cannot overdraw the winning token balance", async () => {
+      try {
+        await program.methods
+          .redeemYes(new BN(2n * ONE_USDC))
+          .accounts({
+            user: user.publicKey,
+            config: configKey,
+            market,
+            yesMint,
+            vault,
+            userUsdc,
+            userYes,
+            tokenProgram: TOKEN_PROGRAM_ID,
+          })
+          .signers([user])
+          .rpc();
+        expect.fail();
+      } catch (e: any) {
+        expect(e.toString()).to.match(/insufficient|custom program error|0x1/i);
+      }
     });
 
     it("redeem_no after YesWins: WrongOutcomeForRedemption", async () => {
