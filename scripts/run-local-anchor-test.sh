@@ -73,6 +73,8 @@ echo "[local-test] running anchor test on local validator"
 ANCHOR_PROVIDER_URL="${ANCHOR_PROVIDER_URL:-http://127.0.0.1:8899}" \
 ANCHOR_WALLET="${ANCHOR_WALLET:-./keypairs/admin.json}" \
 CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-2}" \
-anchor test
+anchor test \
+  --provider.cluster localnet \
+  --provider.wallet "${ANCHOR_WALLET:-./keypairs/admin.json}"
 
 echo "[local-test] passed; restored committed devnet program id"
