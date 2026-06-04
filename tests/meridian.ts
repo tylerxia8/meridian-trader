@@ -60,9 +60,7 @@ function sleep(ms: number): Promise<void> {
 
 async function getOrCreateAta(connection: anchor.web3.Connection, payer: Keypair, mint: PublicKey, owner: PublicKey) {
   return (
-    await getOrCreateAssociatedTokenAccount(connection, payer, mint, owner, false, "confirmed", {
-      commitment: "confirmed",
-    })
+    await getOrCreateAssociatedTokenAccount(connection, payer, mint, owner, false, "confirmed")
   ).address;
 }
 
