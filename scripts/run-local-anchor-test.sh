@@ -67,7 +67,25 @@ restore() {
 trap restore EXIT
 
 echo "[local-test] syncing source ids to local target/deploy keypair"
-anchor keys sync >/dev/null
+local_program_id="$(solana-keygen pubkey target/deploy/meridian-keypair.json)"
+python3 - "$local_program_id" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+program_id = sys.argv[1]
+
+anchor_toml = Path("Anchor.toml")
+text = anchor_toml.read_text()
+text = re.sub(r'(meridian\s*=\s*")[^"]+(")', rf'\g<1>{program_id}\2', text)
+anchor_toml.write_text(text)
+
+lib_rs = Path("programs/meridian/src/lib.rs")
+text = lib_rs.read_text()
+text = re.sub(r'declare_id!\("[^"]+"\);', f'declare_id!("{program_id}");', text)
+lib_rs.write_text(text)
+PY
+echo "[local-test] temporary local program id: ${local_program_id}"
 
 echo "[local-test] running anchor test on local validator"
 ANCHOR_PROVIDER_URL="${ANCHOR_PROVIDER_URL:-http://127.0.0.1:8899}" \
