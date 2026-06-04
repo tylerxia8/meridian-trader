@@ -14,6 +14,7 @@
     "test:program:local": "bash scripts/run-local-anchor-test.sh",
     "test:program:skip-deploy": "anchor test --skip-deploy",
     "deploy:devnet": "anchor deploy --provider.cluster devnet",
+    "deploy:devnet:smoke": "bash scripts/deploy-devnet-smoke.sh",
     "lifecycle:demo": "tsx scripts/lifecycle.ts",
     "demo:status": "tsx scripts/demo-status.ts",
     "tradable:status": "tsx scripts/tradable-status.ts",

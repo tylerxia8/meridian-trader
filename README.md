@@ -130,6 +130,14 @@ anchor keys list
 
 Copy the `meridian` program ID into both `MERIDIAN_PROGRAM_ID` and `NEXT_PUBLIC_MERIDIAN_PROGRAM_ID`.
 
+For repeatable devnet deployments, use the guarded deploy/smoke wrapper:
+
+```bash
+npm run deploy:devnet:smoke
+```
+
+It builds the program, deploys with `target/deploy/meridian-keypair.json`, verifies generated artifacts, prints Anchor keys, and runs `demo:status`. Set `MERIDIAN_SKIP_STATUS=true` to skip the status smoke before the config account is initialized.
+
 ## Demo Commands
 
 ```bash
@@ -207,6 +215,7 @@ POST /api/phoenix-seat
 - **Liquidity gating:** the UI and API only allow market-order actions when the required Phoenix side has live depth.
 
 For current devnet program IDs, known-good markets, and demo notes, see [docs/DEVNET_DEMO.md](docs/DEVNET_DEMO.md).
+Before any mainnet-style deployment, work through [docs/SECURITY_REVIEW.md](docs/SECURITY_REVIEW.md).
 
 ## Status
 
