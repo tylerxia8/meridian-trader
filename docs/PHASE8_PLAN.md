@@ -48,8 +48,9 @@ This calls `scripts/run-local-anchor-test.sh`, which:
 - Generates `keypairs/admin.json` if missing.
 - Generates `target/deploy/meridian-keypair.json` if missing.
 - Temporarily runs `anchor keys sync` so local test ids match.
-- Runs `anchor test --provider.cluster localnet` against a local validator,
-  avoiding devnet deploys and RPC rate limits.
+- Runs `anchor test --provider.cluster localnet --validator legacy` against
+  `solana-test-validator`, avoiding devnet deploys, RPC rate limits, and an
+  extra Surfpool install.
 - Restores the committed devnet program id in `Anchor.toml` and `lib.rs` on exit.
 
 Remaining work:

@@ -75,6 +75,7 @@ ANCHOR_WALLET="${ANCHOR_WALLET:-./keypairs/admin.json}" \
 CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-2}" \
 anchor test \
   --provider.cluster localnet \
-  --provider.wallet "${ANCHOR_WALLET:-./keypairs/admin.json}"
+  --provider.wallet "${ANCHOR_WALLET:-./keypairs/admin.json}" \
+  --validator legacy
 
 echo "[local-test] passed; restored committed devnet program id"
